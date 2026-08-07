@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "splitta-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "splitta-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "start"],
+      "cwd": "frontend",
+      "port": 3200,
+      "autoPort": true
+    }
+  ]
+}

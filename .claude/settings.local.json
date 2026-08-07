@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/131.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;700&display=swap\")",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/131.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,100..900;1,100..900&display=swap\")"
+    ]
+  }
+}
