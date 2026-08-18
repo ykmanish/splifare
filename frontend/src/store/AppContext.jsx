@@ -41,11 +41,17 @@ function applyTheme(theme) {
   document.documentElement.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
   document.body.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
 
-  const themeMeta =
-    document.querySelector('meta[name="theme-color"]:not([media])') ||
-    document.head.appendChild(document.createElement('meta'));
-  themeMeta.setAttribute('name', 'theme-color');
-  themeMeta.setAttribute('content', dark ? '#08090a' : '#e9ebec');
+  const themeColor = dark ? '#08090a' : '#e9ebec';
+  const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
+  if (!themeMetas.length) {
+    const themeMeta = document.head.appendChild(document.createElement('meta'));
+    themeMeta.setAttribute('name', 'theme-color');
+    themeMetas.push(themeMeta);
+  }
+  themeMetas.forEach((meta) => {
+    meta.setAttribute('content', themeColor);
+    meta.removeAttribute('media');
+  });
 
   const appleStatusMeta =
     document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]') ||

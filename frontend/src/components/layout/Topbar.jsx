@@ -10,7 +10,7 @@ import { useApp } from '@/store/AppContext';
 import { firstName } from '@/lib/format';
 
 /**
- * Sticky glass chrome at the top of every screen.
+ * Sticky solid chrome at the top of every screen.
  *
  * No title  → avatar left, "Welcome back," over the first name.
  * With title → back IconCircle (or the avatar) left, centred title.
@@ -26,7 +26,7 @@ export default function Topbar({ title, subtitle, back, right, onOpenNotificatio
   const goBack = () => (typeof back === 'string' ? router.push(back) : router.back());
 
   return (
-    <header className="sticky top-0 z-30 glass pt-safe">
+    <header className="sticky top-0 z-30 bg-canvas pt-safe">
       <div className="grid h-16 grid-cols-[auto_1fr_auto] items-center gap-3 px-5">
         {/* ---------------------------------------------- left control */}
         {back ? (
