@@ -12,8 +12,18 @@
  * network first and only fall back to the cache.
  */
 
-const VERSION = 'splitta-v1';
+const VERSION = 'splitta-v2';
 const OFFLINE_URL = '/offline.html';
+
+/*
+ * Where a share lands. The OS POSTs multipart form data to /share, and a page
+ * cannot read a POST body — so this worker takes the request, stashes the
+ * payload in Cache Storage and redirects to a screen that reads it back out.
+ * Its own cache, so clearing a share never touches the offline page.
+ */
+const SHARE_CACHE = 'splitta-share';
+const SHARE_TEXT = '/__shared/text';
+const SHARE_FILE = '/__shared/file';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,14 +38,67 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== VERSION && k !== SHARE_CACHE)
+            .map((k) => caches.delete(k)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
 
+/** Lift a shared payload out of the POST and hand the page a URL it can load. */
+async function receiveShare(request) {
+  try {
+    const form = await request.formData();
+
+    const text = ['title', 'text', 'url']
+      .map((k) => form.get(k))
+      .filter((v) => typeof v === 'string' && v.trim())
+      .join('\n');
+
+    const cache = await caches.open(SHARE_CACHE);
+    await cache.put(
+      SHARE_TEXT,
+      new Response(JSON.stringify({ text, at: Date.now() }), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const file = form.get('media');
+    if (file && typeof file !== 'string' && file.size) {
+      await cache.put(
+        SHARE_FILE,
+        new Response(file, {
+          headers: {
+            'content-type': file.type || 'application/octet-stream',
+            'x-share-name': encodeURIComponent(file.name || 'shared-image'),
+          },
+        }),
+      );
+    } else {
+      // Otherwise a previous share's image would resurface under new text.
+      await cache.delete(SHARE_FILE);
+    }
+  } catch {
+    /* the screen handles an empty stash on its own */
+  }
+
+  // 303 so the browser follows with a GET rather than re-POSTing.
+  return Response.redirect('/share?received=1', 303);
+}
+
 /** Network-first for page loads, with the offline card as the last resort. */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  if (request.method === 'POST' && new URL(request.url).pathname === '/share') {
+    event.respondWith(receiveShare(request));
+    return;
+  }
+
   if (request.method !== 'GET' || request.mode !== 'navigate') return;
 
   event.respondWith(
