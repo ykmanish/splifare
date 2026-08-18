@@ -11,7 +11,7 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     title: 'Splitta',
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
   },
   formatDetection: {
     telephone: false,

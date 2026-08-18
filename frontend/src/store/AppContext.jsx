@@ -38,6 +38,20 @@ function applyTheme(theme) {
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark', dark);
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  document.documentElement.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
+  document.body.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
+
+  const themeMeta =
+    document.querySelector('meta[name="theme-color"]:not([media])') ||
+    document.head.appendChild(document.createElement('meta'));
+  themeMeta.setAttribute('name', 'theme-color');
+  themeMeta.setAttribute('content', dark ? '#08090a' : '#e9ebec');
+
+  const appleStatusMeta =
+    document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]') ||
+    document.head.appendChild(document.createElement('meta'));
+  appleStatusMeta.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+  appleStatusMeta.setAttribute('content', dark ? 'black-translucent' : 'default');
 }
 
 if (typeof window !== 'undefined') {
