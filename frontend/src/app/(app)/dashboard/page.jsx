@@ -207,8 +207,11 @@ export default function DashboardPage() {
         </Section>
 
         {/* --------------------------------------------- metrics */}
+        {/* White, not a pastel: this row is the one place semantic green and red
+            are used at small sizes, and they need a neutral behind them. A grey
+            fill would also read as almost nothing against the warm canvas. */}
         <Section delay={0.08}>
-          <Card tone="butter" pad={false} className="p-5">
+          <Card tone="white" pad={false} className="p-5">
             <MetricRow
               stats={[
                 {
