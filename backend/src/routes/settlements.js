@@ -4,6 +4,7 @@ const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
 const { round2 } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
+const { canTransactWith } = require('../utils/people');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -39,7 +40,12 @@ router.post(
       throw new HttpError(403, 'You can only record payments you are part of');
     }
 
-    const other = await User.findById(from === req.userId ? to : from);
+    const otherId = from === req.userId ? to : from;
+    if (!(await canTransactWith(req.user, otherId))) {
+      throw new HttpError(403, 'You can only record payments with friends and group members');
+    }
+
+    const other = await User.findById(otherId);
     if (!other) throw new HttpError(404, 'That person no longer exists');
 
     const settlement = await Settlement.create({

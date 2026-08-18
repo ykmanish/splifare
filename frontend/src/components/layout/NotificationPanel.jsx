@@ -12,6 +12,9 @@ import {
   ShoppingCart,
   Users,
   UserPlus,
+  UserCheck,
+  KeyRound,
+  DoorOpen,
   CheckCheck,
   Bell,
   Trash2,
@@ -31,7 +34,11 @@ const KIND = {
   list_shared: { icon: ShoppingCart, tint: 'var(--info)' },
   list_completed: { icon: ShoppingCart, tint: 'var(--pos)' },
   group_invite: { icon: Users, tint: 'var(--info)' },
+  group_joined: { icon: KeyRound, tint: 'var(--info)' },
+  group_left: { icon: DoorOpen, tint: 'var(--warn)' },
   friend_added: { icon: UserPlus, tint: 'var(--brand)' },
+  friend_request: { icon: UserPlus, tint: 'var(--warn)' },
+  friend_accepted: { icon: UserCheck, tint: 'var(--pos)' },
 };
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -43,6 +50,9 @@ const onClient = () => true;
 const onServer = () => false;
 
 function routeFor(n) {
+  // A request has no friendship to open yet — send them where they can answer.
+  if (n.type === 'friend_request') return '/friends';
+
   switch (n.entityType) {
     case 'group':
       return `/groups/${n.entityId}`;
@@ -167,8 +177,7 @@ export default function NotificationPanel({ open, onClose }) {
                 <SheetHeader
                   title="Notifications"
                   subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
-                  left={<IconCircle icon={X} onClick={onClose} label="Close notifications" />}
-                  right={
+                  left={
                     unreadCount > 0 ? (
                       <IconCircle
                         icon={CheckCheck}
@@ -177,6 +186,7 @@ export default function NotificationPanel({ open, onClose }) {
                       />
                     ) : null
                   }
+                  right={<IconCircle icon={X} onClick={onClose} label="Close notifications" />}
                 />
               </div>
 

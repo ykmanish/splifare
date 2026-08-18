@@ -30,7 +30,7 @@ function Section({ i = 0, className = '', children }) {
 }
 
 export default function SettleUpSheet({ open, onClose, prefill = {} }) {
-  const { me, people, groups, expenses, settlements, currency, settleUp } = useApp();
+  const { me, people, friends, groups, expenses, settlements, currency, settleUp } = useApp();
   const { toast } = useToast();
 
   const [withId, setWithId] = useState('');
@@ -45,7 +45,26 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const [status, setStatus] = useState(null);
   const [recorded, setRecorded] = useState(null);
 
-  const others = useMemo(() => people.filter((p) => p.id !== me?.id), [people, me]);
+  /**
+   * Friends, plus anyone you already share an expense with. The second half
+   * matters: leaving a group or unfriending must not strand a real balance
+   * with nobody to pay it to.
+   */
+  const others = useMemo(() => {
+    const shared = new Set();
+    for (const e of expenses) {
+      const ids = [...e.paidBy, ...e.splits].map((r) => r.userId);
+      if (ids.includes(me?.id)) ids.forEach((uid) => shared.add(uid));
+    }
+
+    const seen = new Set([me?.id]);
+    return [...friends, ...people].filter((p) => {
+      if (seen.has(p.id)) return false;
+      if (!p.isFriend && !shared.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }, [people, friends, expenses, me]);
 
   /* Balance for the chosen scope, so we can suggest the right amount. */
   const scopedLedger = useMemo(

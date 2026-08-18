@@ -4,6 +4,7 @@ const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
 const { round2, splitsBalance } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
+const { assertReachable } = require('../utils/people');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -84,6 +85,12 @@ router.post(
       }
     }
 
+    await assertReachable(
+      req.user,
+      [...paidBy, ...splits].map((s) => s.user),
+      'an expense',
+    );
+
     const expense = await Expense.create({
       group: group?._id || null,
       description,
@@ -142,6 +149,16 @@ router.patch(
       splits: req.body.splits ?? expense.splits,
       items: req.body.items ?? expense.items,
     });
+
+    // Only newly-named people are gated. Someone already on the expense who
+    // has since left the group stays editable — otherwise a stale membership
+    // would freeze an expense nobody can correct.
+    const already = new Set(expense.participants.map(String));
+    await assertReachable(
+      req.user,
+      [...paidBy, ...splits].map((s) => s.user).filter((u) => !already.has(String(u))),
+      'an expense',
+    );
 
     Object.assign(expense, {
       amount,

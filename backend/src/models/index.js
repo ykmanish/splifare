@@ -42,7 +42,12 @@ const userSchema = new Schema(
       default: 'adventurer',
     },
     avatarBg: { type: String, default: '', trim: true, maxlength: 12 },
-    /** People this user has added — the "friends" list. */
+    /**
+     * Shareable handle. Someone who knows it can send a friend request
+     * without knowing the email address, so it is safe to paste in a chat.
+     */
+    code: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
+    /** Confirmed, mutual friendships only — requests live in FriendRequest. */
     friends: [ref('User')],
   },
   {
@@ -72,6 +77,8 @@ const groupSchema = new Schema(
     },
     members: [ref('User')],
     createdBy: ref('User'),
+    /** Room code — anyone holding it can join the group. */
+    code: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
   },
   baseOptions,
 );
@@ -220,7 +227,11 @@ const notificationSchema = new Schema(
         'list_shared',
         'list_completed',
         'group_invite',
+        'group_joined',
+        'group_left',
         'friend_added',
+        'friend_request',
+        'friend_accepted',
       ],
       required: true,
     },
@@ -233,6 +244,29 @@ const notificationSchema = new Schema(
   baseOptions,
 );
 notificationSchema.index({ user: 1, createdAt: -1 });
+
+/* -------------------------------------------------- FriendRequest */
+
+/**
+ * One row per invitation. Kept after the fact (status `accepted` /
+ * `declined`) so a declined request cannot be spammed straight back, and
+ * so re-friending after a removal reuses the same row.
+ */
+const friendRequestSchema = new Schema(
+  {
+    from: { ...ref('User'), required: true, index: true },
+    to: { ...ref('User'), required: true, index: true },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'declined'],
+      default: 'pending',
+    },
+    respondedAt: { type: Date, default: null },
+  },
+  baseOptions,
+);
+// One row per ordered pair — `requestBetween` reuses it in both directions.
+friendRequestSchema.index({ from: 1, to: 1 }, { unique: true });
 
 /* -------------------------------------------------------------- Activity */
 
@@ -256,6 +290,7 @@ activitySchema.index({ audience: 1, createdAt: -1 });
 module.exports = {
   User: model('User', userSchema),
   Group: model('Group', groupSchema),
+  FriendRequest: model('FriendRequest', friendRequestSchema),
   Expense: model('Expense', expenseSchema),
   Settlement: model('Settlement', settlementSchema),
   ShoppingList: model('ShoppingList', listSchema),

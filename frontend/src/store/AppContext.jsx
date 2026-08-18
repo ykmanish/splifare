@@ -21,6 +21,7 @@ import {
   normList,
   normNotification,
   normActivity,
+  normFriendRequest,
 } from '@/lib/api';
 import { buildLedger, balancesFor } from '@/lib/balances';
 import { round2 } from '@/lib/format';
@@ -83,6 +84,9 @@ const EMPTY = {
   lists: [],
   notifications: [],
   activity: [],
+  incoming: [],
+  outgoing: [],
+  myCode: '',
 };
 
 export function AppProvider({ children }) {
@@ -100,7 +104,7 @@ export function AppProvider({ children }) {
   const loadAll = useCallback(async () => {
     setSyncing(true);
     try {
-      const [people, groups, expenses, settlements, lists, notifications, activity] =
+      const [people, groups, expenses, settlements, lists, notifications, activity, requests] =
         await Promise.all([
           api.people(),
           api.groups(),
@@ -109,16 +113,20 @@ export function AppProvider({ children }) {
           api.lists(),
           api.notifications(),
           api.activity(),
+          api.friendRequests(),
         ]);
 
       setData({
         people: people.people.map(normUser),
+        myCode: people.code || '',
         groups: groups.groups.map(normGroup),
         expenses: expenses.expenses.map(normExpense),
         settlements: settlements.settlements.map(normSettlement),
         lists: lists.lists.map(normList),
         notifications: notifications.notifications.map(normNotification),
         activity: activity.activity.map(normActivity),
+        incoming: requests.incoming.map(normFriendRequest),
+        outgoing: requests.outgoing.map(normFriendRequest),
       });
       setOffline(false);
     } catch (err) {
@@ -139,7 +147,13 @@ export function AppProvider({ children }) {
   const refresh = useCallback(
     async (keys = ['expenses', 'settlements', 'notifications', 'activity']) => {
       const jobs = {
-        people: () => api.people().then((r) => ({ people: r.people.map(normUser) })),
+        people: () =>
+          api.people().then((r) => ({ people: r.people.map(normUser), myCode: r.code || '' })),
+        requests: () =>
+          api.friendRequests().then((r) => ({
+            incoming: r.incoming.map(normFriendRequest),
+            outgoing: r.outgoing.map(normFriendRequest),
+          })),
         groups: () => api.groups().then((r) => ({ groups: r.groups.map(normGroup) })),
         expenses: () => api.expenses().then((r) => ({ expenses: r.expenses.map(normExpense) })),
         settlements: () =>
@@ -192,14 +206,22 @@ export function AppProvider({ children }) {
     const tick = async () => {
       if (stopped || document.visibilityState !== 'visible') return;
       try {
-        const r = await api.notifications();
+        // Friend requests ride along with the poll so an invite lands on the
+        // friends screen without the recipient reloading anything.
+        const [r, reqs] = await Promise.all([api.notifications(), api.friendRequests()]);
         if (stopped) return;
         const next = r.notifications.map(normNotification);
+        const incoming = reqs.incoming.map(normFriendRequest);
+        const outgoing = reqs.outgoing.map(normFriendRequest);
         setData((d) => {
+          const sameIds = (a, b) =>
+            a.length === b.length && a.every((x, i) => x.id === b[i]?.id);
           const changed =
             next.length !== d.notifications.length ||
-            next.some((n, i) => n.id !== d.notifications[i]?.id || n.read !== d.notifications[i]?.read);
-          return changed ? { ...d, notifications: next } : d;
+            next.some((n, i) => n.id !== d.notifications[i]?.id || n.read !== d.notifications[i]?.read) ||
+            !sameIds(incoming, d.incoming) ||
+            !sameIds(outgoing, d.outgoing);
+          return changed ? { ...d, notifications: next, incoming, outgoing } : d;
         });
       } catch {
         /* transient — the next tick retries */
@@ -248,6 +270,22 @@ export function AppProvider({ children }) {
   const personById = useCallback(
     (pid) => data.people.find((p) => p.id === pid) || { id: pid, name: 'Someone', email: '' },
     [data.people],
+  );
+
+  /**
+   * Only confirmed friends. `people` is wider — it also holds the people you
+   * merely share a group with, so names still resolve on a group screen — but
+   * pickers must offer friends only.
+   */
+  const friends = useMemo(
+    () => data.people.filter((p) => p.isFriend && p.id !== me?.id),
+    [data.people, me],
+  );
+
+  /** Friends plus yourself, in the order a picker wants them. */
+  const splitPool = useMemo(
+    () => (me ? [me, ...friends] : friends),
+    [me, friends],
   );
 
   const ledger = useMemo(
@@ -358,16 +396,40 @@ export function AppProvider({ children }) {
       refresh,
       reload: loadAll,
 
-      /* ---- people ---- */
-      addPerson: async ({ name, email, phone }) => {
-        const { person } = await api.addFriend({ name, email, phone });
-        await refresh(['people']);
-        return normUser(person);
+      /* ---- friend requests ---- */
+
+      /** `query` is an exact email address or a Splitta code. */
+      sendFriendRequest: async (query) => {
+        const res = await api.sendFriendRequest(String(query || '').trim());
+        // The server auto-accepts when the other person had already asked,
+        // so the friend list can change here too.
+        await refresh(res.accepted ? ['people', 'requests'] : ['requests']);
+        return {
+          accepted: !!res.accepted,
+          message: res.message || '',
+          person: res.person ? normUser(res.person) : normFriendRequest(res.request)?.person,
+        };
+      },
+
+      acceptFriendRequest: async (rid) => {
+        const { person } = await api.acceptFriendRequest(rid);
+        await refresh(['people', 'requests', 'activity', 'notifications']);
+        return person ? normUser(person) : null;
+      },
+
+      declineFriendRequest: async (rid) => {
+        await api.declineFriendRequest(rid);
+        await refresh(['requests']);
+      },
+
+      cancelFriendRequest: async (rid) => {
+        await api.cancelFriendRequest(rid);
+        await refresh(['requests']);
       },
 
       removeFriend: async (pid) => {
         await api.removeFriend(pid);
-        await refresh(['people']);
+        await refresh(['people', 'requests']);
       },
 
       /* ---- groups ---- */
@@ -383,6 +445,32 @@ export function AppProvider({ children }) {
       deleteGroup: async (gid) => {
         await api.deleteGroup(gid);
         await refresh(['groups', 'expenses', 'lists']);
+      },
+
+      /* ---- room codes ---- */
+
+      /** Look up a code without joining, so the sheet can confirm the group. */
+      previewGroup: async (code) => {
+        const { group } = await api.groupByCode(String(code || '').trim());
+        return group;
+      },
+
+      joinGroup: async (code) => {
+        const { group, alreadyIn } = await api.joinGroup(String(code || '').trim());
+        // `people` too: co-members become visible the moment you are in.
+        await refresh(['groups', 'people', 'expenses', 'notifications', 'activity']);
+        return { group: normGroup(group), alreadyIn: !!alreadyIn };
+      },
+
+      leaveGroup: async (gid) => {
+        await api.leaveGroup(gid);
+        await refresh(['groups', 'people', 'lists', 'activity']);
+      },
+
+      rotateGroupCode: async (gid) => {
+        const { group } = await api.rotateGroupCode(gid);
+        await refresh(['groups']);
+        return normGroup(group);
       },
 
       /* ---- expenses ---- */
@@ -521,13 +609,30 @@ export function AppProvider({ children }) {
       prefs,
       currency: prefs.currency,
       ...data,
+      friends,
+      splitPool,
+      requestCount: data.incoming.length,
       ledger,
       overview,
       unreadCount,
       personById,
       ...actions,
     }),
-    [ready, syncing, offline, me, prefs, data, ledger, overview, unreadCount, personById, actions],
+    [
+      ready,
+      syncing,
+      offline,
+      me,
+      prefs,
+      data,
+      friends,
+      splitPool,
+      ledger,
+      overview,
+      unreadCount,
+      personById,
+      actions,
+    ],
   );
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;

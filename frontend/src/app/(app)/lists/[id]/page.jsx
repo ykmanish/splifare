@@ -107,6 +107,7 @@ function ListDetailInner() {
     lists,
     groups,
     people,
+    friends,
     currency,
     personById,
     addItem,
@@ -508,6 +509,7 @@ function ListDetailInner() {
         list={list}
         groups={groups}
         people={people}
+        friends={friends}
         meId={me.id}
         currency={currency}
         onSave={(patch) => updateList(list.id, patch)}
@@ -636,6 +638,7 @@ function ListSettingsSheet({
   list,
   groups,
   people,
+  friends,
   meId,
   currency,
   onSave,
@@ -648,6 +651,20 @@ function ListSettingsSheet({
   const [groupId, setGroupId] = useState(list.groupId || '');
   const [memberIds, setMemberIds] = useState(list.memberIds);
   const [busy, setBusy] = useState(false);
+
+  /* You first, then friends, then existing members who are not friends. */
+  const roster = useMemo(() => {
+    const me = people.find((p) => p.id === meId);
+    const existing = list.memberIds.map((mid) => people.find((p) => p.id === mid));
+    const seen = new Set();
+    const out = [];
+    for (const p of [me, ...friends, ...existing]) {
+      if (!p || seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    return out;
+  }, [people, friends, list.memberIds, meId]);
 
   async function save() {
     if (busy) return;
@@ -710,10 +727,11 @@ function ListSettingsSheet({
         <div>
           <Label hint={`${memberIds.length} people`}>Sharing with</Label>
           <div className="space-y-1.5">
-            {people.map((p) => (
+            {roster.map((p) => (
               <PersonToggle
                 key={p.id}
                 person={{ ...p, name: p.id === meId ? 'You' : p.name }}
+                subtitle={p.id === meId ? 'You — always on the list' : undefined}
                 selected={memberIds.includes(p.id)}
                 disabled={p.id === meId}
                 onToggle={(pid) =>
@@ -722,6 +740,9 @@ function ListSettingsSheet({
               />
             ))}
           </div>
+          <p className="newq mt-2.5 px-1.5 text-[12px]">
+            Your friends, plus anyone already sharing this list.
+          </p>
         </div>
 
         <div>

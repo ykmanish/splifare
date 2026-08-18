@@ -329,13 +329,20 @@ body {
   }
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  letter-spacing: inherit;
-  color: inherit;
+/* In the base layer on purpose. Unlayered, `color: inherit` would outrank
+   every Tailwind text-* utility, so a lime button could not set its own ink
+   and inherited --text instead — near-black in light, near-white (and
+   unreadable) in dark. Base loses to utilities, so `text-on-brand` wins and
+   controls with no colour utility still inherit as before. */
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
 }
 
 button {

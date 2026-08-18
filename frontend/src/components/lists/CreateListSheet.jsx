@@ -41,7 +41,7 @@ function Section({ i = 0, className = '', children }) {
 }
 
 export default function CreateListSheet({ open, onClose, defaultGroupId = '' }) {
-  const { me, people, groups, createList, addPerson, currency } = useApp();
+  const { me, people, friends, groups, createList, currency } = useApp();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -54,10 +54,6 @@ export default function CreateListSheet({ open, onClose, defaultGroupId = '' }) 
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [addingPerson, setAddingPerson] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [addBusy, setAddBusy] = useState(false);
 
   // React's "adjust state when a prop changes" pattern, as in AddExpenseSheet.
   // Seeding during render on the closed → open edge avoids the extra commit
@@ -74,39 +70,29 @@ export default function CreateListSheet({ open, onClose, defaultGroupId = '' }) 
       setStore('');
       setBudget('');
       setTouched(false);
-      setAddingPerson(false);
-      setNewName('');
-      setNewEmail('');
-      setAddBusy(false);
       const g = groups.find((x) => x.id === defaultGroupId);
       setMemberIds(g ? g.memberIds.filter((m) => m !== me?.id) : []);
     }
   }
 
-  const others = people.filter((p) => p.id !== me?.id);
+  const others = (() => {
+    const group = groups.find((x) => x.id === groupId);
+    const fromGroup = group
+      ? group.memberIds.map((gid) => people.find((p) => p.id === gid)).filter(Boolean)
+      : [];
+    const seen = new Set([me?.id]);
+    return [...friends, ...fromGroup].filter((p) => {
+      if (!p || seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  })();
   const canSave = name.trim().length > 1;
 
   function onGroup(id) {
     setGroupId(id);
     const g = groups.find((x) => x.id === id);
     if (g) setMemberIds(g.memberIds.filter((m) => m !== me.id));
-  }
-
-  async function onAddPerson() {
-    if (!newName.trim() || addBusy) return;
-    setAddBusy(true);
-    try {
-      const p = await addPerson({ name: newName, email: newEmail });
-      setMemberIds((m) => [...m, p.id]);
-      setNewName('');
-      setNewEmail('');
-      setAddingPerson(false);
-      toast({ title: `${p.name} added`, description: 'They can shop this list with you.' });
-    } catch (err) {
-      toast({ tone: 'error', title: 'Could not add them', description: err.message });
-    } finally {
-      setAddBusy(false);
-    }
   }
 
   async function submit(e) {
@@ -271,63 +257,23 @@ export default function CreateListSheet({ open, onClose, defaultGroupId = '' }) 
               />
             ))}
 
-            {!addingPerson && (
+            {others.length === 0 && (
               <FieldRow
                 icon={UserPlus}
                 iconTint="var(--brand)"
                 iconBg="var(--sky)"
-                label="Add someone new"
-                sublabel="They can shop this list with you"
-                plus
-                onClick={() => setAddingPerson(true)}
+                label="Nobody to share with yet"
+                sublabel="Add a friend, or pick a group above"
+                href="/friends"
+                chevron
               />
             )}
           </ListGroup>
-        </Section>
 
-        {/* ------------------------------------------------ inline add */}
-        {addingPerson && (
-          <Section i={6}>
-            <GroupLabel>Add someone new</GroupLabel>
-            <div className="space-y-2.5">
-              <Input
-                placeholder="Their name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-              <Input
-                placeholder="Email (optional)"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-              <div className="flex gap-2.5 pt-0.5">
-                <Button
-                  type="button"
-                  variant="soft"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setAddingPerson(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="dark"
-                  size="sm"
-                  icon={Check}
-                  className="flex-1"
-                  onClick={onAddPerson}
-                  loading={addBusy}
-                  disabled={!newName.trim()}
-                >
-                  Add them
-                </Button>
-              </div>
-            </div>
-          </Section>
-        )}
+          <p className="newq mt-2.5 px-1.5 text-[12px]">
+            Friends and the members of the group you picked.
+          </p>
+        </Section>
 
         <button type="submit" className="hidden" aria-hidden />
       </form>

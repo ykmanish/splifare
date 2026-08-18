@@ -100,7 +100,8 @@ function initialForm({ editing, prefill, groups, me }) {
 }
 
 export default function AddExpenseSheet({ open, onClose, prefill = {}, editing = null }) {
-  const { me, people, groups, currency, addExpense, updateExpense, deleteExpense } = useApp();
+  const { me, people, splitPool, groups, currency, addExpense, updateExpense, deleteExpense } =
+    useApp();
   const { toast } = useToast();
 
   const [amount, setAmount] = useState('');
@@ -128,8 +129,9 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
       const g = groups.find((x) => x.id === groupId);
       return g ? g.memberIds.map((id) => people.find((p) => p.id === id)).filter(Boolean) : [];
     }
-    return people;
-  }, [groupId, groups, people]);
+    // No group means no shared room, so only confirmed friends are offered.
+    return splitPool;
+  }, [groupId, groups, people, splitPool]);
 
   /* -------------------------------------------------- open / reset */
 
@@ -347,7 +349,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
             subtitle={
               groupId
                 ? groups.find((g) => g.id === groupId)?.name
-                : 'Splitting with the people you pick below'
+                : 'Splitting with the friends you pick below'
             }
             right={
               editing ? (

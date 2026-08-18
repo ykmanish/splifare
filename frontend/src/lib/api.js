@@ -80,13 +80,21 @@ export const normUser = (u) =>
   u && {
     id: id(u),
     name: u.name,
-    email: u.email,
+    email: u.email || '',
     phone: u.phone || '',
     currency: u.currency || 'INR',
     theme: u.theme || 'system',
     avatarSeed: u.avatarSeed || '',
     avatarStyle: u.avatarStyle || 'adventurer',
     avatarBg: u.avatarBg || '',
+    /** Shareable handle — only ever sent for your own account. */
+    code: u.code || '',
+    /**
+     * Confirmed friend, versus someone visible only because you share a
+     * group. Non-friends stay out of every picker. `/auth/me` does not send
+     * the flag, so it defaults to true and never hides you from yourself.
+     */
+    isFriend: u.isFriend !== false,
   };
 
 export const normGroup = (g) =>
@@ -96,6 +104,7 @@ export const normGroup = (g) =>
     emoji: g.emoji,
     type: g.type,
     memberIds: ids(g.members),
+    code: g.code || '',
     createdBy: id(g.createdBy),
     createdAt: g.createdAt,
   };
@@ -165,6 +174,16 @@ export const normList = (l) =>
     })),
   };
 
+export const normFriendRequest = (r) =>
+  r && {
+    id: id(r),
+    status: r.status,
+    fromId: id(r.fromId ?? r.from),
+    toId: id(r.toId ?? r.to),
+    person: normUser(r.person),
+    createdAt: r.createdAt,
+  };
+
 export const normNotification = (n) =>
   n && {
     id: id(n),
@@ -204,14 +223,26 @@ export const api = {
 
   /* people */
   people: () => get('/friends'),
-  addFriend: (body) => post('/friends', body),
   removeFriend: (pid) => del(`/friends/${pid}`),
+
+  /* friend requests */
+  friendRequests: () => get('/friends/requests'),
+  sendFriendRequest: (query) => post('/friends/requests', { query }),
+  acceptFriendRequest: (rid) => post(`/friends/requests/${rid}/accept`),
+  declineFriendRequest: (rid) => post(`/friends/requests/${rid}/decline`),
+  cancelFriendRequest: (rid) => del(`/friends/requests/${rid}`),
 
   /* groups */
   groups: () => get('/groups'),
   createGroup: (body) => post('/groups', body),
   updateGroup: (gid, body) => patch(`/groups/${gid}`, body),
   deleteGroup: (gid) => del(`/groups/${gid}`),
+
+  /* room codes */
+  groupByCode: (code) => get(`/groups/code/${encodeURIComponent(code)}`),
+  joinGroup: (code) => post('/groups/join', { code }),
+  leaveGroup: (gid) => post(`/groups/${gid}/leave`),
+  rotateGroupCode: (gid) => post(`/groups/${gid}/code`),
 
   /* expenses */
   expenses: (params = '') => get(`/expenses${params}`),

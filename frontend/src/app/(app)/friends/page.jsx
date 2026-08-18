@@ -3,7 +3,16 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowDownLeft, ArrowUpRight, Check, UserPlus, UsersRound } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  Clock,
+  Mail,
+  UserPlus,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import Page from '@/components/layout/Page';
 import { useUI } from '@/components/layout/AppShell';
 import Button from '@/components/ui/Button';
@@ -11,11 +20,12 @@ import Avatar from '@/components/ui/Avatar';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import { Input, SearchInput } from '@/components/ui/Field';
 import { Badge, Card, EmptyState, RowMenu, cycleTone } from '@/components/ui/Bits';
-import { BubbleTile, CoralFab, GroupLabel } from '@/components/ui/Blocks';
+import { BubbleTile, CoralFab, GroupLabel, ListGroup } from '@/components/ui/Blocks';
+import CodeBox from '@/components/ui/CodeBox';
 import { Pills } from '@/components/ui/Controls';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
-import { money, firstName } from '@/lib/format';
+import { money, firstName, relativeTime } from '@/lib/format';
 
 const EASE = [0.16, 1, 0.3, 1];
 const enter = (i = 0) => ({
@@ -26,28 +36,53 @@ const enter = (i = 0) => ({
 
 /* ------------------------------------------------------------------ add */
 
+/**
+ * Friendship is by invitation now: you send a request to an exact email or
+ * Splitta code, and nothing is shared until the other person accepts.
+ */
 function AddFriendSheet({ open, onClose }) {
-  const { addPerson } = useApp();
+  const { sendFriendRequest, myCode, me } = useApp();
   const { toast } = useToast();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [touched, setTouched] = useState(false);
+  const [query, setQuery] = useState('');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setQuery('');
+      setError('');
+      setBusy(false);
+    }
+  }
 
   async function submit(e) {
     e?.preventDefault();
-    setTouched(true);
-    if (!name.trim() || busy) return;
+    const clean = query.trim();
+    if (!clean) {
+      setError('Enter their email or Splitta code');
+      return;
+    }
+    if (busy) return;
+    setError('');
     setBusy(true);
     try {
-      const p = await addPerson({ name, email });
-      toast({ title: `${p.name} added`, description: 'You can now split expenses with them.' });
-      setName('');
-      setEmail('');
-      setTouched(false);
+      const res = await sendFriendRequest(clean);
+      toast(
+        res.accepted
+          ? { title: 'You are friends', description: res.message }
+          : {
+              title: 'Request sent',
+              description: res.person
+                ? `${res.person.name} has to accept before you can split.`
+                : 'They have to accept before you can split.',
+            },
+      );
+      setQuery('');
       onClose();
     } catch (err) {
-      toast({ tone: 'error', title: 'Could not add them', description: err.message });
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -58,39 +93,101 @@ function AddFriendSheet({ open, onClose }) {
       open={open}
       onClose={onClose}
       title="Add a friend"
-      subtitle="Anyone you split money with"
-      size="sm"
+      subtitle="They accept before anything is shared"
       footer={
         <div className="flex gap-2.5">
           <Button variant="soft" size="md" onClick={onClose} className="flex-1">
             Cancel
           </Button>
           <Button size="md" onClick={submit} loading={busy} className="flex-[2]">
-            Add friend
+            Send request
           </Button>
         </div>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
-        <Input
-          label="Name"
-          placeholder="Meera Iyer"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={touched && !name.trim() ? 'Enter a name' : ''}
-          autoFocus
-        />
-        <Input
-          label="Email"
-          hint="optional"
-          type="email"
-          placeholder="meera@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      <form onSubmit={submit} className="space-y-6">
+        <div>
+          <Input
+            label="Their email or code"
+            placeholder="meera@example.com  ·  H4K 9TP"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setError('');
+            }}
+            error={error}
+            icon={Mail}
+            autoCapitalize="off"
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+          />
+          <p className="newq mt-2 px-1.5 text-[12px]">
+            Has to match exactly — nobody can be found by browsing.
+          </p>
+        </div>
+
+        <div>
+          <GroupLabel>Or let them add you</GroupLabel>
+          <CodeBox
+            code={myCode}
+            label="Your Splitta code"
+            hint="Share it and they can send you a request"
+            shareTitle="Add me on Splitta"
+            shareText={`Add me on Splitta — my code is ${myCode}${
+              me?.name ? ` (${me.name})` : ''
+            }`}
+          />
+        </div>
+
         <button type="submit" className="hidden" aria-hidden />
       </form>
     </Sheet>
+  );
+}
+
+/* -------------------------------------------------------------- requests */
+
+function IncomingCard({ request, index, onAccept, onDecline, busy }) {
+  const p = request.person;
+
+  return (
+    <motion.div {...enter(index)}>
+      <Card tone="limeSoft" pad={false} className="px-4 py-4">
+        <div className="flex items-center gap-3">
+          <Avatar person={p} size="md" />
+          <span className="min-w-0 flex-1">
+            <span className="newq text-ink block truncate text-[15.5px]">{p.name}</span>
+            <span className="newq block truncate text-[12.5px]">
+              wants to be friends · {relativeTime(request.createdAt)}
+            </span>
+          </span>
+        </div>
+
+        <div className="mt-3.5 flex gap-2.5">
+          <Button
+            variant="soft"
+            size="sm"
+            icon={X}
+            className="flex-1"
+            disabled={busy}
+            onClick={onDecline}
+          >
+            Decline
+          </Button>
+          <Button
+            variant="dark"
+            size="sm"
+            icon={Check}
+            className="flex-[1.6]"
+            loading={busy}
+            onClick={onAccept}
+          >
+            Accept
+          </Button>
+        </div>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -179,7 +276,19 @@ function FriendCard({ person, balance, currency, tone, index, onSettle, onRemove
 /* ------------------------------------------------------------------ page */
 
 export default function FriendsPage() {
-  const { me, people, overview, currency, removeFriend } = useApp();
+  const {
+    me,
+    friends,
+    incoming,
+    outgoing,
+    myCode,
+    overview,
+    currency,
+    removeFriend,
+    acceptFriendRequest,
+    declineFriendRequest,
+    cancelFriendRequest,
+  } = useApp();
   const { openSettle } = useUI();
   const { toast } = useToast();
 
@@ -187,6 +296,7 @@ export default function FriendsPage() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [pendingRemove, setPendingRemove] = useState(null);
+  const [workingId, setWorkingId] = useState(null);
 
   const balanceOf = useMemo(
     () => Object.fromEntries(overview.rows.map((r) => [r.userId, r.amount])),
@@ -194,8 +304,7 @@ export default function FriendsPage() {
   );
 
   const rows = useMemo(() => {
-    return people
-      .filter((p) => p.id !== me.id)
+    return friends
       .map((p) => ({ ...p, balance: balanceOf[p.id] || 0 }))
       .filter((p) => {
         if (filter === 'owed' && p.balance <= 0.005) return false;
@@ -203,16 +312,33 @@ export default function FriendsPage() {
         return p.name.toLowerCase().includes(q.trim().toLowerCase());
       })
       .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance) || a.name.localeCompare(b.name));
-  }, [people, me, balanceOf, q, filter]);
+  }, [friends, balanceOf, q, filter]);
 
   async function confirmRemove() {
     const p = pendingRemove;
     if (!p) return;
     try {
       await removeFriend(p.id);
-      toast({ title: `${firstName(p.name)} removed`, description: 'They are no longer in your friends list.' });
+      toast({
+        title: `${firstName(p.name)} removed`,
+        description: 'Neither of you can add the other to an expense now.',
+      });
     } catch (err) {
       toast({ tone: 'error', title: 'Could not remove them', description: err.message });
+    }
+  }
+
+  /** Accept / decline / cancel all follow the same busy-and-report shape. */
+  async function respond(id, run, done, failed) {
+    if (workingId) return;
+    setWorkingId(id);
+    try {
+      await run();
+      if (done) toast(done);
+    } catch (err) {
+      toast({ tone: 'error', title: failed, description: err.message });
+    } finally {
+      setWorkingId(null);
     }
   }
 
@@ -238,8 +364,95 @@ export default function FriendsPage() {
           />
         </motion.div>
 
+        {/* ------------------------------------------------ incoming */}
+        {incoming.length > 0 && (
+          <motion.section {...enter(1)}>
+            <GroupLabel
+              action={
+                <span className="newq num text-[12px] uppercase tracking-[0.07em] text-ink-3">
+                  {incoming.length}
+                </span>
+              }
+            >
+              Friend requests
+            </GroupLabel>
+            <div className="space-y-3">
+              {incoming.map((r, i) => (
+                <IncomingCard
+                  key={r.id}
+                  request={r}
+                  index={i}
+                  busy={workingId === r.id}
+                  onAccept={() =>
+                    respond(
+                      r.id,
+                      () => acceptFriendRequest(r.id),
+                      {
+                        title: `${firstName(r.person.name)} is now a friend`,
+                        description: 'You can split expenses together.',
+                      },
+                      'Could not accept',
+                    )
+                  }
+                  onDecline={() =>
+                    respond(
+                      r.id,
+                      () => declineFriendRequest(r.id),
+                      { tone: 'info', title: 'Request declined' },
+                      'Could not decline',
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </motion.section>
+        )}
+
+        {/* ------------------------------------------------ outgoing */}
+        {outgoing.length > 0 && (
+          <motion.section {...enter(2)}>
+            <GroupLabel>Waiting on them</GroupLabel>
+            <ListGroup>
+              {outgoing.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                  <Avatar person={r.person} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="newq text-ink block truncate text-[14.5px]">
+                      {r.person.name}
+                    </span>
+                    <span className="newq block truncate text-[12px]">
+                      sent {relativeTime(r.createdAt)}
+                    </span>
+                  </span>
+                  <Badge tone="butter" icon={Clock}>
+                    pending
+                  </Badge>
+                  <button
+                    type="button"
+                    aria-label={`Cancel request to ${r.person.name}`}
+                    disabled={workingId === r.id}
+                    onClick={() =>
+                      respond(
+                        r.id,
+                        () => cancelFriendRequest(r.id),
+                        { tone: 'info', title: 'Request withdrawn' },
+                        'Could not withdraw it',
+                      )
+                    }
+                    className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2
+                      text-ink-3 tap hover:bg-surface-3 hover:text-ink active:scale-90
+                      disabled:opacity-40"
+                  >
+                    <X size={15} strokeWidth={2.4} />
+                  </button>
+                </div>
+              ))}
+            </ListGroup>
+          </motion.section>
+        )}
+
         {/* ------------------------------------------------ filter + search */}
-        <motion.div {...enter(1)} className="space-y-3">
+        <motion.div {...enter(3)} className="space-y-3">
           <Pills
             options={[
               { id: 'all', label: 'All' },
@@ -250,13 +463,13 @@ export default function FriendsPage() {
             onChange={setFilter}
           />
 
-          {people.length > 4 && (
+          {friends.length > 4 && (
             <SearchInput value={q} onChange={setQ} placeholder="Search friends…" />
           )}
         </motion.div>
 
         {/* ------------------------------------------------ list */}
-        <motion.section {...enter(2)}>
+        <motion.section {...enter(4)}>
           <GroupLabel action={<span className="newq text-[12px]  uppercase tracking-[0.07em] text-ink-3 num">{rows.length}</span>}>
             {groupLabel}
           </GroupLabel>
@@ -276,7 +489,7 @@ export default function FriendsPage() {
                 }
                 body={
                   filter === 'all' && !q
-                    ? 'Add the people you share bills with to start tracking balances.'
+                    ? 'Send a request with someone’s email or Splitta code. Once they accept, they show up whenever you split a bill.'
                     : 'Try a different filter.'
                 }
                 action={
@@ -305,6 +518,18 @@ export default function FriendsPage() {
             </div>
           )}
         </motion.section>
+
+        {/* ------------------------------------------------ your code */}
+        <motion.section {...enter(5)}>
+          <GroupLabel>Your code</GroupLabel>
+          <CodeBox
+            code={myCode}
+            label="Add me on Splitta"
+            hint="Anyone with this can send you a friend request"
+            shareTitle="Add me on Splitta"
+            shareText={`Add me on Splitta — my code is ${myCode}${me?.name ? ` (${me.name})` : ''}`}
+          />
+        </motion.section>
       </div>
 
       {/* ------------------------------------------------------------ fab */}
@@ -326,7 +551,7 @@ export default function FriendsPage() {
         onClose={() => setPendingRemove(null)}
         onConfirm={confirmRemove}
         title={pendingRemove ? `Remove ${firstName(pendingRemove.name)}?` : 'Remove friend?'}
-        body="They will be taken off your friends list. Shared expenses stay on record."
+        body="You come off each other’s friend lists, so neither of you can add the other to a new expense. Shared expenses stay on record."
         confirmLabel="Remove"
         danger
       />

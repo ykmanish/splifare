@@ -3,15 +3,17 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Plus, UsersRound, UserPlus } from 'lucide-react';
+import { KeyRound, Plus, Sparkles, UsersRound, UserPlus } from 'lucide-react';
 import Page from '@/components/layout/Page';
 import Button from '@/components/ui/Button';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import { Input, Label, SearchInput } from '@/components/ui/Field';
 import { PersonToggle } from '@/components/ui/Avatar';
 import { Badge, Card, EmptyState, RowMenu, cycleTone } from '@/components/ui/Bits';
-import { AvatarCluster, CoralFab, GroupLabel } from '@/components/ui/Blocks';
+import { AvatarCluster, CoralFab, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
+import CodeBox, { spaceCode } from '@/components/ui/CodeBox';
 import CreateGroupSheet from '@/components/groups/CreateGroupSheet';
+import JoinGroupSheet from '@/components/groups/JoinGroupSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor } from '@/lib/balances';
@@ -23,7 +25,7 @@ const EASE = [0.16, 1, 0.3, 1];
 /* ------------------------------------------------------------------ edit */
 
 function EditGroupSheet({ group, onClose }) {
-  const { me, people, updateGroup } = useApp();
+  const { me, friends, people, updateGroup, rotateGroupCode } = useApp();
   const { toast } = useToast();
 
   const [gid, setGid] = useState(null);
@@ -31,6 +33,20 @@ function EditGroupSheet({ group, onClose }) {
   const [emoji, setEmoji] = useState('🏠');
   const [memberIds, setMemberIds] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [rotating, setRotating] = useState(false);
+
+  /* Friends you could add, plus whoever is already here — someone who joined
+     by code is a member without being a friend, and must still be listed. */
+  const roster = useMemo(() => {
+    const seen = new Set([me?.id]);
+    const out = [];
+    for (const p of [...friends, ...(group?.memberIds || []).map((id) => people.find((x) => x.id === id))]) {
+      if (!p || seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    return out;
+  }, [friends, people, group, me]);
 
   /* Seed the form the moment a group is handed in. Keeping this in render
      (rather than an effect) means the sheet never flashes stale values. */
@@ -53,6 +69,22 @@ function EditGroupSheet({ group, onClose }) {
       const next = m.includes(pid) ? m.filter((x) => x !== pid) : [...m, pid];
       return next.length ? next : m;
     });
+  }
+
+  async function onRotate() {
+    if (!group || rotating) return;
+    setRotating(true);
+    try {
+      await rotateGroupCode(group.id);
+      toast({
+        title: 'New room code',
+        description: 'The old one stops working right away.',
+      });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not change the code', description: err.message });
+    } finally {
+      setRotating(false);
+    }
   }
 
   async function save() {
@@ -135,25 +167,83 @@ function EditGroupSheet({ group, onClose }) {
         </div>
 
         <div>
+          <Label>Room code</Label>
+          <CodeBox
+            code={group?.code}
+            label="Anyone with this can join"
+            hint="Rotate it if it ends up somewhere it should not be"
+            shareTitle={`Join ${group?.name || 'my group'} on Splitta`}
+            shareText={`Join ${group?.name || 'my group'} on Splitta — the room code is ${group?.code || ''}`}
+            onRotate={onRotate}
+            rotating={rotating}
+          />
+        </div>
+
+        <div>
           <Label hint={`${memberIds.length} in this group`}>Members</Label>
           <div className="space-y-1.5">
-            {people.map((p) => (
+            <PersonToggle person={me} subtitle="You — always a member" selected disabled />
+            {roster.map((p) => (
               <PersonToggle
                 key={p.id}
                 person={p}
-                subtitle={p.id === me?.id ? 'You — always a member' : p.email}
+                subtitle={p.isFriend ? p.email : 'joined with the code'}
                 selected={memberIds.includes(p.id)}
-                disabled={p.id === me?.id}
                 onToggle={toggle}
               />
             ))}
           </div>
-          <p className="newq mt-2.5 flex items-center gap-1.5 px-1.5 text-[12px]">
-            <UserPlus size={13} />
-            Add new people from the friends screen first.
+          <p className="newq mt-2.5 flex items-start gap-1.5 px-1.5 text-[12px]">
+            <UserPlus size={13} className="mt-0.5 shrink-0" />
+            Only your friends can be added from here. Everyone else joins with the room code.
           </p>
         </div>
       </div>
+    </Sheet>
+  );
+}
+
+/* --------------------------------------------------------------- chooser */
+
+/**
+ * The FAB has two jobs now — start a circle, or walk into one someone else
+ * started — so it asks which before opening either form.
+ */
+function StartSheet({ open, onClose, onCreate, onJoin }) {
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Add a group"
+      subtitle="Start your own, or join with a code"
+      size="sm"
+    >
+      <ListGroup tone="fill">
+        <FieldRow
+          icon={Sparkles}
+          iconTint="var(--brand)"
+          iconBg="var(--brand-soft)"
+          label="Create a group"
+          sublabel="You get a room code to share"
+          chevron
+          onClick={() => {
+            onClose();
+            onCreate();
+          }}
+        />
+        <FieldRow
+          icon={KeyRound}
+          iconTint="var(--info)"
+          iconBg="var(--sky)"
+          label="Join with a code"
+          sublabel="Someone already made one"
+          chevron
+          onClick={() => {
+            onClose();
+            onJoin();
+          }}
+        />
+      </ListGroup>
     </Sheet>
   );
 }
@@ -183,6 +273,12 @@ function GroupTile({ group, index, currency, onEdit, onDelete }) {
         href={`/groups/${group.id}`}
         size={100}
       />
+
+      {group.code && (
+        <p className="newq num mt-2 text-center text-[11px] uppercase tracking-[0.12em] text-ink-3">
+          {spaceCode(group.code)}
+        </p>
+      )}
 
       <div className="mt-3 text-center">
         {settled ? (
@@ -214,6 +310,8 @@ function GroupsInner() {
   const params = useSearchParams();
 
   const [creating, setCreating] = useState(params.get('new') === '1');
+  const [joining, setJoining] = useState(params.get('join') === '1');
+  const [choosing, setChoosing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [q, setQ] = useState('');
@@ -305,13 +403,18 @@ function GroupsInner() {
                 body={
                   q
                     ? 'Try a different search.'
-                    : 'Make one for your flat, a trip, or anyone you split with regularly.'
+                    : 'Make one for your flat, a trip, or anyone you split with regularly — then share its room code.'
                 }
                 action={
                   q ? undefined : (
-                    <Button variant="dark" icon={Plus} onClick={() => setCreating(true)}>
-                      New group
-                    </Button>
+                    <div className="flex flex-col items-center gap-2.5">
+                      <Button variant="dark" icon={Plus} onClick={() => setCreating(true)}>
+                        New group
+                      </Button>
+                      <Button variant="soft" icon={KeyRound} onClick={() => setJoining(true)}>
+                        Join with a code
+                      </Button>
+                    </div>
                   )
                 }
               />
@@ -350,7 +453,7 @@ function GroupsInner() {
           >
             <Card tone="skySoft" className="text-center">
               <p className="newq text-[12.5px]">
-                A circle keeps a flat, a trip or a crew on its own tab.
+                Every circle has a room code. Share it and people walk straight in.
               </p>
             </Card>
           </motion.div>
@@ -362,12 +465,21 @@ function GroupsInner() {
       <div className="phone pointer-events-none fixed inset-x-0 bottom-0 z-30">
         <div className="flex justify-end px-5 pb-28">
           <span className="pointer-events-auto">
-            <CoralFab icon={Plus} label="New group" onClick={() => setCreating(true)} />
+            <CoralFab icon={Plus} label="Add a group" onClick={() => setChoosing(true)} />
           </span>
         </div>
       </div>
 
+      <StartSheet
+        open={choosing}
+        onClose={() => setChoosing(false)}
+        onCreate={() => setCreating(true)}
+        onJoin={() => setJoining(true)}
+      />
+
       <CreateGroupSheet open={creating} onClose={() => setCreating(false)} />
+
+      <JoinGroupSheet open={joining} onClose={() => setJoining(false)} />
 
       <EditGroupSheet group={editing} onClose={() => setEditing(null)} />
 

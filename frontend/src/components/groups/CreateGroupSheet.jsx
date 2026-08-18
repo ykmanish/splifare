@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Check } from 'lucide-react';
+import { ArrowRight, UserPlus, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Sheet from '@/components/ui/Sheet';
 import Button from '@/components/ui/Button';
@@ -11,6 +11,7 @@ import Picker from '@/components/ui/Picker';
 import { Badge } from '@/components/ui/Bits';
 import { GroupLabel, ListGroup, FieldRow, PersonRow, SheetHeader } from '@/components/ui/Blocks';
 import { PersonToggle } from '@/components/ui/Avatar';
+import CodeBox from '@/components/ui/CodeBox';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { GROUP_TYPES, GROUP_EMOJIS } from '@/lib/categories';
@@ -32,7 +33,7 @@ function Section({ i = 0, className = '', children }) {
 }
 
 export default function CreateGroupSheet({ open, onClose, onCreated }) {
-  const { me, people, createGroup, addPerson } = useApp();
+  const { me, friends, createGroup } = useApp();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -43,10 +44,8 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [addingPerson, setAddingPerson] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [addBusy, setAddBusy] = useState(false);
+  /** Set once the group exists, which swaps the sheet to the code hand-off. */
+  const [created, setCreated] = useState(null);
 
   // React's "adjust state when a prop changes" pattern, as in AddExpenseSheet.
   // Seeding during render on the closed → open edge avoids the extra commit
@@ -62,37 +61,16 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
       setType('home');
       setMemberIds([]);
       setTouched(false);
-      setAddingPerson(false);
-      setNewName('');
-      setNewEmail('');
-      setAddBusy(false);
+      setCreated(null);
     }
   }
 
-  const others = people.filter((p) => p.id !== me?.id);
   const canSave = name.trim().length > 1;
 
   function onTypeChange(t) {
     if (!t) return;
     setType(t.id);
     setEmoji(t.emoji);
-  }
-
-  async function onAddPerson() {
-    if (!newName.trim() || addBusy) return;
-    setAddBusy(true);
-    try {
-      const p = await addPerson({ name: newName, email: newEmail });
-      setMemberIds((m) => [...m, p.id]);
-      setNewName('');
-      setNewEmail('');
-      setAddingPerson(false);
-      toast({ title: `${p.name} added`, description: 'They are now selectable in this group.' });
-    } catch (err) {
-      toast({ tone: 'error', title: 'Could not add them', description: err.message });
-    } finally {
-      setAddBusy(false);
-    }
   }
 
   async function onSubmit(e) {
@@ -103,15 +81,74 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
     try {
       const g = await createGroup({ name, emoji, type, memberIds });
       toast({ title: 'Group created', description: `${g.name} · ${g.memberIds.length} members` });
-      onClose();
-      if (onCreated) onCreated(g);
-      else router.push(`/groups/${g.id}`);
+      setCreated(g);
     } catch (err) {
       toast({ tone: 'error', title: 'Could not create the group', description: err.message });
     } finally {
       setBusy(false);
     }
   }
+
+  function finish() {
+    const g = created;
+    onClose();
+    if (!g) return;
+    if (onCreated) onCreated(g);
+    else router.push(`/groups/${g.id}`);
+  }
+
+  /* ---------------------------------------------------------- created */
+
+  // The code is the only way anyone outside your friend list gets in, so it
+  // gets a screen of its own rather than a line in a toast.
+  if (created) {
+    return (
+      <Sheet
+        open={open}
+        onClose={finish}
+        footer={
+          <Button size="lg" block iconRight={ArrowRight} onClick={finish}>
+            Open {created.name}
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          <Section i={0}>
+            <SheetHeader
+              left={
+                <div className="grid size-10 place-items-center rounded-[14px] bg-surface-2 text-[20px]">
+                  {created.emoji}
+                </div>
+              }
+              title={`${created.name} is live`}
+              subtitle={`${created.memberIds.length} ${
+                created.memberIds.length === 1 ? 'member' : 'members'
+              } so far`}
+            />
+          </Section>
+
+          <Section i={1}>
+            <CodeBox
+              code={created.code}
+              label="Room code"
+              hint="Anyone with this code can join the group"
+              shareTitle={`Join ${created.name} on Splitta`}
+              shareText={`Join ${created.name} on Splitta — the room code is ${created.code}`}
+            />
+          </Section>
+
+          <Section i={2}>
+            <p className="newq px-1.5 text-[13px] leading-relaxed">
+              Send the code to anyone who should be in here. They do not have to be your
+              friend first — joining the room is enough to split expenses in it.
+            </p>
+          </Section>
+        </div>
+      </Sheet>
+    );
+  }
+
+  /* ------------------------------------------------------------ form */
 
   return (
     <Sheet
@@ -205,7 +242,7 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
               trailing={<Badge tone="mint">Member</Badge>}
             />
 
-            {others.map((p) => (
+            {friends.map((p) => (
               <PersonToggle
                 key={p.id}
                 person={p}
@@ -217,63 +254,25 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
               />
             ))}
 
-            {!addingPerson && (
+            {friends.length === 0 && (
               <FieldRow
                 icon={UserPlus}
                 iconTint="var(--brand)"
                 iconBg="var(--sky)"
-                label="Add someone new"
-                sublabel="They become selectable right here"
-                plus
-                onClick={() => setAddingPerson(true)}
+                label="No friends to add yet"
+                sublabel="Create the group anyway and share its code"
+                href="/friends"
+                chevron
               />
             )}
           </ListGroup>
-        </Section>
 
-        {/* ------------------------------------------------ inline add */}
-        {addingPerson && (
-          <Section i={5}>
-            <GroupLabel>Add someone new</GroupLabel>
-            <div className="space-y-2.5">
-              <Input
-                placeholder="Their name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-              <Input
-                placeholder="Email (optional)"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-              <div className="flex gap-2.5 pt-0.5">
-                <Button
-                  type="button"
-                  variant="soft"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setAddingPerson(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="dark"
-                  size="sm"
-                  icon={Check}
-                  className="flex-1"
-                  onClick={onAddPerson}
-                  loading={addBusy}
-                  disabled={!newName.trim()}
-                >
-                  Add them
-                </Button>
-              </div>
-            </div>
-          </Section>
-        )}
+          <p className="newq mt-2.5 flex items-start gap-1.5 px-1.5 text-[12px]">
+            <Users size={13} className="mt-0.5 shrink-0" />
+            Friends can be added here. Everyone else joins with the room code you get
+            once the group exists.
+          </p>
+        </Section>
 
         <button type="submit" className="hidden" aria-hidden />
       </form>

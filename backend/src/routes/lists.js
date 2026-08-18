@@ -4,6 +4,7 @@ const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
 const { splitsFromItems } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
+const { assertReachable } = require('../utils/people');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -46,6 +47,7 @@ router.post(
     if (name.length < 2) throw new HttpError(400, 'Give the list a name');
 
     const members = [...new Set([req.userId, ...(req.body.memberIds || []).map(String)])];
+    await assertReachable(req.user, members, 'a list');
 
     const list = await ShoppingList.create({
       name,
@@ -84,7 +86,11 @@ router.patch(
     }
     if (req.body.groupId !== undefined) list.group = req.body.groupId || null;
     if (Array.isArray(req.body.memberIds)) {
-      list.members = [...new Set([req.userId, ...req.body.memberIds.map(String)])];
+      const next = [...new Set([req.userId, ...req.body.memberIds.map(String)])];
+      // Only newcomers are gated — people already sharing the list stay put.
+      const already = new Set(list.members.map(String));
+      await assertReachable(req.user, next.filter((id) => !already.has(id)), 'a list');
+      list.members = next;
     }
 
     await list.save();

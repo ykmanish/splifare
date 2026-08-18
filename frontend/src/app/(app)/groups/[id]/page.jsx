@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   ChevronLeft,
+  DoorOpen,
   Plus,
   Receipt,
   ShoppingBasket,
@@ -39,6 +40,7 @@ import {
   SheetHeader,
   StatusPill,
 } from '@/components/ui/Blocks';
+import CodeBox from '@/components/ui/CodeBox';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor, netByMember, simplify, shareOf } from '@/lib/balances';
@@ -136,7 +138,7 @@ export default function GroupDetailPage() {
   const { openExpense, openSettle, editExpense } = useUI();
   const {
     me,
-    people,
+    friends,
     groups,
     expenses,
     settlements,
@@ -144,6 +146,8 @@ export default function GroupDetailPage() {
     currency,
     updateGroup,
     deleteGroup,
+    leaveGroup,
+    rotateGroupCode,
     deleteExpense,
     deleteList,
     personById,
@@ -152,6 +156,8 @@ export default function GroupDetailPage() {
   const [tab, setTab] = useState('expenses');
   const [managing, setManaging] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState(null);
   const [deletingList, setDeletingList] = useState(null);
 
@@ -196,6 +202,17 @@ export default function GroupDetailPage() {
   }
 
   const members = group.memberIds.map((m) => personById(m));
+
+  /* Friends you could still add, plus everyone already here — someone who
+     joined with the code is a member without being a friend. */
+  const roster = [];
+  const seenIds = new Set([me.id]);
+  for (const p of [...friends, ...members]) {
+    if (!p || seenIds.has(p.id)) continue;
+    seenIds.add(p.id);
+    roster.push(p);
+  }
+
   const groupLists = lists.filter((l) => l.groupId === group.id);
   const { mine, nets, transfers, groupExpenses, total } = data;
   const settled = Math.abs(mine.net) < 0.005;
@@ -245,6 +262,29 @@ export default function GroupDetailPage() {
       await updateGroup(group.id, { memberIds: next });
     } catch (err) {
       toast({ tone: 'error', title: 'Could not update members', description: err.message });
+    }
+  }
+
+  async function onRotateCode() {
+    if (rotating) return;
+    setRotating(true);
+    try {
+      await rotateGroupCode(group.id);
+      toast({ title: 'New room code', description: 'The old one stops working right away.' });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not change the code', description: err.message });
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  async function onLeaveGroup() {
+    try {
+      await leaveGroup(group.id);
+      toast({ tone: 'info', title: `You left ${group.name}`, description: 'Your balance here stays on record.' });
+      router.push('/groups');
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not leave the group', description: err.message });
     }
   }
 
@@ -298,6 +338,17 @@ export default function GroupDetailPage() {
               className="!size-10 bg-surface-2 !text-ink"
               onEdit={openSettings}
               onDelete={() => setConfirmDelete(true)}
+              extra={
+                <button
+                  type="button"
+                  onClick={() => setConfirmLeave(true)}
+                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left
+                    text-ink tap hover:bg-surface-2 active:scale-[0.985]"
+                >
+                  <DoorOpen size={19} strokeWidth={2.1} />
+                  <span className="newq text-ink text-[15px]">Leave group</span>
+                </button>
+              }
             />
           }
         />
@@ -325,6 +376,17 @@ export default function GroupDetailPage() {
                 </p>
               )}
             </Card>
+          </Section>
+
+          {/* ------------------------------------------------- room code */}
+          <Section delay={0.02}>
+            <CodeBox
+              code={group.code}
+              label="Room code"
+              hint="Share it and they can join without a friend request"
+              shareTitle={`Join ${group.name} on Splitta`}
+              shareText={`Join ${group.name} on Splitta — the room code is ${group.code}`}
+            />
           </Section>
 
           {/* --------------------------------------------------- actions */}
@@ -605,23 +667,53 @@ export default function GroupDetailPage() {
           </div>
 
           <div>
+            <Label>Room code</Label>
+            <CodeBox
+              code={group.code}
+              label="Anyone with this can join"
+              hint="Rotate it if it ends up somewhere it should not be"
+              shareTitle={`Join ${group.name} on Splitta`}
+              shareText={`Join ${group.name} on Splitta — the room code is ${group.code}`}
+              onRotate={onRotateCode}
+              rotating={rotating}
+            />
+          </div>
+
+          <div>
             <Label hint={`${group.memberIds.length} in this group`}>Members</Label>
             <div className="space-y-1.5">
-              {people.map((p) => (
+              <PersonToggle person={me} subtitle="You — always a member" selected disabled />
+              {roster.map((p) => (
                 <PersonToggle
                   key={p.id}
                   person={p}
-                  subtitle={p.id === me.id ? 'You — always a member' : p.email}
+                  subtitle={p.isFriend ? p.email : 'joined with the code'}
                   selected={group.memberIds.includes(p.id)}
-                  disabled={p.id === me.id}
                   onToggle={toggleMember}
                 />
               ))}
             </div>
-            <p className="newq mt-2.5 flex items-center gap-1.5 px-1.5 text-[12px]">
-              <UserPlus size={13} />
-              Add new people from the friends screen first.
+            <p className="newq mt-2.5 flex items-start gap-1.5 px-1.5 text-[12px]">
+              <UserPlus size={13} className="mt-0.5 shrink-0" />
+              Only your friends can be added from here. Everyone else joins with the room code.
             </p>
+          </div>
+
+          <div>
+            <GroupLabel>Leaving</GroupLabel>
+            <Card tone="skySoft" pad={false}>
+              <FieldRow
+                icon={DoorOpen}
+                iconTint="var(--info)"
+                iconBg="var(--sky)"
+                label="Leave this group"
+                sublabel="The group carries on without you"
+                onClick={() => {
+                  setManaging(false);
+                  setConfirmLeave(true);
+                }}
+              />
+            </Card>
           </div>
 
           <div>
@@ -642,6 +734,22 @@ export default function GroupDetailPage() {
           </div>
         </div>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title={`Leave ${group.name}?`}
+        body={
+          settled
+            ? 'You come off the member list. The expenses you were part of stay on record for everyone else.'
+            : `You still have ${money(Math.abs(mine.net), currency)} ${
+                mine.net > 0 ? 'owed to you' : 'to pay'
+              } here. Leaving does not clear it — settle up first if you want it closed.`
+        }
+        confirmLabel="Leave group"
+        danger
+        onConfirm={onLeaveGroup}
+      />
 
       <ConfirmSheet
         open={confirmDelete}
