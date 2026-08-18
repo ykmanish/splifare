@@ -14,6 +14,14 @@ const toShares = (rows = []) =>
     .map((r) => ({ user: String(r.user || r.userId), amount: round2(r.amount) }))
     .filter((r) => r.user && r.user !== 'undefined');
 
+const toItems = (rows = []) =>
+  rows
+    .map((r) => ({
+      name: String(r.name || '').trim(),
+      price: round2(r.price),
+    }))
+    .filter((r) => r.name && r.price > 0);
+
 function validate(body) {
   const amount = round2(body.amount);
   if (!(amount > 0)) throw new HttpError(400, 'Enter an amount above zero');
@@ -33,7 +41,19 @@ function validate(body) {
     throw new HttpError(422, 'The split does not add up to the total');
   }
 
-  return { amount, description, paidBy, splits };
+  const items = toItems(body.items);
+  if (Array.isArray(body.items) && body.items.length && !items.length) {
+    throw new HttpError(400, 'Add at least one item with a name and price');
+  }
+
+  if (items.length) {
+    const itemTotal = round2(items.reduce((sum, item) => sum + item.price, 0));
+    if (Math.abs(itemTotal - amount) > 0.01) {
+      throw new HttpError(422, 'Item prices do not add up to the total');
+    }
+  }
+
+  return { amount, description, paidBy, splits, items };
 }
 
 router.get(
@@ -53,7 +73,7 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { amount, description, paidBy, splits } = validate(req.body);
+    const { amount, description, paidBy, splits, items } = validate(req.body);
 
     let group = null;
     if (req.body.groupId) {
@@ -75,6 +95,7 @@ router.post(
       splitMode: req.body.splitMode || 'equal',
       date: req.body.date ? new Date(req.body.date) : new Date(),
       notes: String(req.body.notes || '').trim(),
+      items,
       createdBy: req.userId,
       list: req.body.listId || null,
     });
@@ -114,11 +135,12 @@ router.patch(
       throw new HttpError(403, 'You are not part of this expense');
     }
 
-    const { amount, description, paidBy, splits } = validate({
+    const { amount, description, paidBy, splits, items } = validate({
       amount: req.body.amount ?? expense.amount,
       description: req.body.description ?? expense.description,
       paidBy: req.body.paidBy ?? expense.paidBy,
       splits: req.body.splits ?? expense.splits,
+      items: req.body.items ?? expense.items,
     });
 
     Object.assign(expense, {
@@ -131,6 +153,7 @@ router.patch(
       splitMode: req.body.splitMode ?? expense.splitMode,
       date: req.body.date ? new Date(req.body.date) : expense.date,
       notes: req.body.notes !== undefined ? String(req.body.notes).trim() : expense.notes,
+      items,
     });
 
     await expense.save();

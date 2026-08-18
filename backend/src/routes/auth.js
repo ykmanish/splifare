@@ -58,7 +58,7 @@ router.patch(
   '/me',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const allowed = ['name', 'phone', 'currency', 'theme'];
+    const allowed = ['name', 'phone', 'currency', 'theme', 'avatarSeed', 'avatarStyle', 'avatarBg'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) req.user[key] = req.body[key];
     }

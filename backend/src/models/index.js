@@ -35,6 +35,13 @@ const userSchema = new Schema(
     phone: { type: String, default: '', trim: true },
     currency: { type: String, default: 'INR' },
     theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
+    avatarSeed: { type: String, default: '', trim: true, maxlength: 80 },
+    avatarStyle: {
+      type: String,
+      enum: ['adventurer', 'lorelei', 'micah', 'notionists', 'personas'],
+      default: 'adventurer',
+    },
+    avatarBg: { type: String, default: '', trim: true, maxlength: 12 },
     /** People this user has added — the "friends" list. */
     friends: [ref('User')],
   },
@@ -80,6 +87,14 @@ const shareSchema = new Schema(
   { _id: false },
 );
 
+const expenseItemSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    price: { type: Number, required: true, min: 0 },
+  },
+  { _id: true },
+);
+
 const expenseSchema = new Schema(
   {
     group: { ...ref('Group'), default: null },
@@ -102,6 +117,7 @@ const expenseSchema = new Schema(
     },
     date: { type: Date, default: Date.now },
     notes: { type: String, default: '', maxlength: 500 },
+    items: { type: [expenseItemSchema], default: [] },
     createdBy: ref('User'),
     list: { ...ref('ShoppingList'), default: null },
     /** Denormalised for cheap "expenses involving me" queries. */
