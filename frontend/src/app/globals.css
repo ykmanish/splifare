@@ -271,6 +271,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--canvas);
   overscroll-behavior: none;
   scroll-behavior: smooth;
 }

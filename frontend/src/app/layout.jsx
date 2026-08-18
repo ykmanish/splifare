@@ -7,12 +7,21 @@ export const metadata = {
   description:
     'Share bills with friends, flatmates and travel groups. Build grocery lists, price them up at the store, and split every item with the right people.',
   applicationName: 'Splitta',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Splitta',
+    statusBarStyle: 'default',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f6f5' },
-    { media: '(prefers-color-scheme: dark)', color: '#080a09' },
+    { media: '(prefers-color-scheme: light)', color: '#e9ebec' },
+    { media: '(prefers-color-scheme: dark)', color: '#08090a' },
   ],
   width: 'device-width',
   initialScale: 1,
