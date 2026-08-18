@@ -97,6 +97,12 @@ function FeedRow({ item, actor, currency, href, menu }) {
     };
   }, [actor, kind]);
 
+  /* Each feed row stores the currency its figure happened in. Rows written
+     before that field existed fall back to the viewer's currency, which is
+     what they were recorded in at the time. */
+  const amountLabel =
+    item.amount != null ? money(item.amount, item.currency || currency) : undefined;
+
   return (
     <FieldRow
       icon={Leading}
@@ -108,7 +114,7 @@ function FeedRow({ item, actor, currency, href, menu }) {
         </span>
       }
       sublabel={relativeTime(item.createdAt)}
-      value={item.amount != null ? money(item.amount, currency) : undefined}
+      value={amountLabel}
       trailing={
         menu ? (
           /* RowMenu's sheet is portalled but still a React child of this row,

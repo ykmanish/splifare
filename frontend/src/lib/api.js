@@ -204,6 +204,7 @@ export const normActivity = (a) =>
     type: a.type,
     text: a.text,
     amount: a.amount ?? null,
+    currency: a.currency || null,
     actorId: id(a.actor),
     entityType: a.entityType,
     entityId: a.entityId,

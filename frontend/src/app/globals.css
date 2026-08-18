@@ -8,16 +8,22 @@
 
 /* ============================================================
    SPLITTA — DESIGN TOKENS
-   Cool grey canvas · white cards · near-black hero panels · lime accent
+   Warm paper canvas · saturated pastel colour-blocks · near-black
+   hero panels · lime accent.
+
+   The pastels are the story now, not a whisper behind it: a card is a
+   block of colour you can name across the room, and consecutive cards
+   never repeat (see TONE_CYCLE). Near-black and lime stay for the one
+   thing on a screen that must be pressed.
    ============================================================ */
 
 :root {
-  /* --- Surfaces --- */
-  --canvas: #e9ebec;
-  --canvas-accent: #e1e4e6;
+  /* --- Surfaces: warm paper, not cool grey --- */
+  --canvas: #f1efeb;
+  --canvas-accent: #e9e6e0;
   --surface: #ffffff;
-  --surface-2: #f2f4f5;
-  --surface-3: #e7eaec;
+  --surface-2: #f7f5f1;
+  --surface-3: #edeae4;
 
   /* Near-black panel — the hero surface */
   --panel: #0b0c0d;
@@ -26,12 +32,12 @@
   --on-panel: #ffffff;
   --on-panel-2: #9aa1a9;
 
-  --border: #e2e5e7;
-  --border-strong: #d0d5d8;
+  --border: #e8e4dd;
+  --border-strong: #d7d2ca;
 
   --text: #0b0c0d;
-  --text-2: #6f767e;
-  --text-3: #9aa1a9;
+  --text-2: #6e6a65;
+  --text-3: #9b968f;
   --text-inv: #ffffff;
 
   /* --- Electric lime: the accent --- */
@@ -51,19 +57,21 @@
   --feature-soft: #f0fdc9;
   --on-feature: #ffffff;
 
-  /* --- Tonal fills: quiet, so lime and black stay the story --- */
-  --butter: #ffffff;
-  --butter-soft: #fdf6e2;
-  --butter-deep: #d98324;
-  --mint: #eaf7f1;
-  --mint-soft: #f3fbf7;
-  --mint-deep: #0fae74;
-  --blush: #fdecee;
-  --blush-soft: #fef5f6;
-  --sky: #eaf0fd;
-  --sky-soft: #f4f7fe;
-  --grape: #f0eefc;
-  --grape-soft: #f7f6fd;
+  /* --- Pastel colour-blocks: saturated enough to read as colour --- */
+  --butter: #f8e5a2;
+  --butter-soft: #fdf3d2;
+  --butter-deep: #c8761a;
+  --mint: #c2e7d4;
+  --mint-soft: #e2f3ea;
+  --mint-deep: #0b9a64;
+  --blush: #f9d2dd;
+  --blush-soft: #fce8ee;
+  --sky: #c9ddfb;
+  --sky-soft: #e5eefd;
+  --grape: #d9cff8;
+  --grape-soft: #ebe6fc;
+  --peach: #fad5b7;
+  --peach-soft: #fdeadb;
 
   /* --- Semantic --- */
   --pos: #0fae74;
@@ -98,24 +106,24 @@
 }
 
 .dark {
-  --canvas: #08090a;
-  --canvas-accent: #0d0f10;
-  --surface: #121415;
-  --surface-2: #191c1e;
-  --surface-3: #212528;
+  --canvas: #0a0908;
+  --canvas-accent: #100f0e;
+  --surface: #151413;
+  --surface-2: #1c1b19;
+  --surface-3: #252321;
 
-  --panel: #121415;
-  --panel-2: #191c1e;
-  --panel-3: #282c30;
+  --panel: #151413;
+  --panel-2: #1c1b19;
+  --panel-3: #2b2926;
   --on-panel: #ffffff;
   --on-panel-2: #8e959c;
 
-  --border: #232729;
-  --border-strong: #333940;
+  --border: #272522;
+  --border-strong: #38352f;
 
-  --text: #eef1f2;
-  --text-2: #99a1a8;
-  --text-3: #6b7279;
+  --text: #f2f0ed;
+  --text-2: #a5a099;
+  --text-3: #746f68;
   --text-inv: #0b0c0d;
 
   --brand: #d4f84e;
@@ -127,18 +135,23 @@
   --feature-soft: rgba(212, 248, 78, 0.14);
   --on-feature: #ffffff;
 
-  --butter: #121415;
-  --butter-soft: rgba(217, 131, 36, 0.15);
+  /* Dark keeps the same six hues, as translucent washes over the canvas —
+     opaque pastels would glow. Stronger than before so a card still reads
+     as its colour rather than as grey. */
+  --butter: rgba(245, 199, 88, 0.2);
+  --butter-soft: rgba(245, 199, 88, 0.12);
   --butter-deep: #e8a44a;
-  --mint: rgba(46, 224, 165, 0.14);
-  --mint-soft: rgba(46, 224, 165, 0.09);
+  --mint: rgba(46, 224, 165, 0.19);
+  --mint-soft: rgba(46, 224, 165, 0.11);
   --mint-deep: #2ee0a5;
-  --blush: rgba(255, 107, 115, 0.14);
-  --blush-soft: rgba(255, 107, 115, 0.09);
-  --sky: rgba(95, 157, 255, 0.14);
-  --sky-soft: rgba(95, 157, 255, 0.09);
-  --grape: rgba(154, 140, 255, 0.15);
-  --grape-soft: rgba(154, 140, 255, 0.1);
+  --blush: rgba(255, 107, 115, 0.19);
+  --blush-soft: rgba(255, 107, 115, 0.11);
+  --sky: rgba(95, 157, 255, 0.19);
+  --sky-soft: rgba(95, 157, 255, 0.11);
+  --grape: rgba(154, 140, 255, 0.2);
+  --grape-soft: rgba(154, 140, 255, 0.12);
+  --peach: rgba(250, 160, 95, 0.2);
+  --peach-soft: rgba(250, 160, 95, 0.12);
 
   --pos: #2ee0a5;
   --pos-soft: rgba(46, 224, 165, 0.14);
@@ -216,6 +229,8 @@
   --color-sky-soft: var(--sky-soft);
   --color-grape: var(--grape);
   --color-grape-soft: var(--grape-soft);
+  --color-peach: var(--peach);
+  --color-peach-soft: var(--peach-soft);
 
   --color-coral: var(--coral);
   --color-coral-soft: var(--coral-soft);

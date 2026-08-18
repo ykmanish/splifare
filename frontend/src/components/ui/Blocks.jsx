@@ -331,13 +331,15 @@ export function MetricRow({ stats = [], className = '' }) {
 
 const BUBBLE_TONES = {
   lavender: 'bg-grape',
+  grape: 'bg-grape',
   butter: 'bg-butter',
   mint: 'bg-mint',
   sky: 'bg-sky',
   blush: 'bg-blush',
+  peach: 'bg-peach',
 };
 
-const BUBBLE_CYCLE = ['lavender', 'sky', 'butter', 'mint', 'blush'];
+const BUBBLE_CYCLE = ['lavender', 'sky', 'butter', 'mint', 'blush', 'peach'];
 
 /**
  * One pastel tile: emoji badge on a white disc, a caption, and a big amount.

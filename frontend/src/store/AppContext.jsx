@@ -42,6 +42,12 @@ const AppCtx = createContext(null);
  * Paint the saved theme as soon as this module evaluates — before React
  * renders — so dark-mode users do not get a light flash.
  */
+/* Must mirror --canvas in globals.css. These are painted as inline styles on
+   <html>/<body> to beat the first paint, so a stale value here silently wins
+   over the stylesheet. */
+const CANVAS_LIGHT = '#f1efeb';
+const CANVAS_DARK = '#0a0908';
+
 function applyTheme(theme) {
   if (typeof document === 'undefined') return;
   const dark =
@@ -49,10 +55,10 @@ function applyTheme(theme) {
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark', dark);
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-  document.documentElement.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
-  document.body.style.backgroundColor = dark ? '#08090a' : '#e9ebec';
+  document.documentElement.style.backgroundColor = dark ? CANVAS_DARK : CANVAS_LIGHT;
+  document.body.style.backgroundColor = dark ? CANVAS_DARK : CANVAS_LIGHT;
 
-  const themeColor = dark ? '#08090a' : '#e9ebec';
+  const themeColor = dark ? CANVAS_DARK : CANVAS_LIGHT;
   const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
   if (!themeMetas.length) {
     const themeMeta = document.head.appendChild(document.createElement('meta'));

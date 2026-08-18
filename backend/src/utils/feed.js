@@ -40,13 +40,23 @@ async function notify({ recipients, actor, type, title, body = '', entityType = 
  * Activity is shared: one document, visible to everyone in `audience`.
  * The text carries **bold** markers the client renders.
  */
-async function logActivity({ audience, actor, type, text, amount = null, entityType = null, entityId = null }) {
+async function logActivity({
+  audience,
+  actor,
+  type,
+  text,
+  amount = null,
+  currency = null,
+  entityType = null,
+  entityId = null,
+}) {
   return Activity.create({
     audience: [...new Set(audience.map(String))],
     actor,
     type,
     text,
     amount,
+    currency,
     entityType,
     entityId,
   });

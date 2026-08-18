@@ -242,6 +242,7 @@ router.post(
       type: 'list_completed',
       text: `**${req.user.name}** turned **${list.name}** into an expense`,
       amount: total,
+      currency: expense.currency,
       entityType: 'list',
       entityId: String(list._id),
     });

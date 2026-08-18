@@ -323,6 +323,9 @@ const activitySchema = new Schema(
     type: { type: String, required: true },
     text: { type: String, required: true },
     amount: { type: Number, default: null },
+    /** The currency `amount` is in. Without it the feed cannot render a
+        figure honestly, since each expense carries its own. */
+    currency: { type: String, default: null },
     entityType: { type: String, default: null },
     entityId: { type: String, default: null },
   },

@@ -6,8 +6,8 @@ export default function manifest() {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#e9ebec',
-    theme_color: '#e9ebec',
+    background_color: '#f1efeb',
+    theme_color: '#f1efeb',
     orientation: 'portrait',
     categories: ['finance', 'productivity'],
     icons: [

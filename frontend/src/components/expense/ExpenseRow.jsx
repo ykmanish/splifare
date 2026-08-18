@@ -33,10 +33,14 @@ export function ExpenseRow({ expense, showGroup = false }) {
   const { net } = shareOf(expense, me?.id);
   const group = groups.find((g) => g.id === expense.groupId);
 
+  // A single expense is exact in the currency it was recorded in. Formatting
+  // a €40 dinner with the viewer's ₹ symbol would just be a lie.
+  const own = expense.currency || currency;
+
   const sub = [
     isMe
-      ? `You paid ${money(expense.amount, currency)}`
-      : `${firstName(payer?.name)} paid ${money(expense.amount, currency)}`,
+      ? `You paid ${money(expense.amount, own)}`
+      : `${firstName(payer?.name)} paid ${money(expense.amount, own)}`,
     expense.items?.length
       ? `${expense.items.length} ${expense.items.length === 1 ? 'item' : 'items'}`
       : null,
@@ -79,7 +83,7 @@ export function ExpenseRow({ expense, showGroup = false }) {
                 <span
                   className={`num block text-[15.5px]  ${net > 0 ? 'text-pos' : 'text-neg'}`}
                 >
-                  {money(Math.abs(net), currency)}
+                  {money(Math.abs(net), own)}
                 </span>
                 <span className="newq block text-[11.5px]">{net > 0 ? 'you lent' : 'you owe'}</span>
               </>

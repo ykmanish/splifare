@@ -52,10 +52,31 @@ function splitsFromItems(items, fallbackIds = []) {
   };
 }
 
+/**
+ * Format an amount for a notification body.
+ *
+ * Notification text is baked at write time and read back verbatim, so the
+ * currency has to be in the string — a bare "1200" tells the reader nothing
+ * about whether they owe rupees or euros.
+ */
+function formatMoney(amount, currency = 'INR') {
+  const value = round2(amount);
+  try {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: String(currency || 'INR').toUpperCase(),
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    // Unknown code: still say which currency it was.
+    return `${String(currency || '').toUpperCase()} ${value}`.trim();
+  }
+}
+
 /** Validate that splits add up to the expense total. */
 function splitsBalance(amount, splits) {
   const sum = splits.reduce((a, s) => a + (Number(s.amount) || 0), 0);
   return Math.abs(round2(sum) - round2(amount)) < 0.01;
 }
 
-module.exports = { round2, allocate, splitsFromItems, splitsBalance };
+module.exports = { round2, allocate, splitsFromItems, splitsBalance, formatMoney };

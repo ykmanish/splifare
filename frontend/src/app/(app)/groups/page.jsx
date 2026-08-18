@@ -361,11 +361,10 @@ function GroupTile({ group, index, currency, onEdit, onDelete }) {
           <Badge tone="onTone">Settled</Badge>
         ) : (
           <>
-            <span
-              className={`num block text-[16.5px]  ${
-                group.net > 0 ? 'text-pos' : 'text-neg'
-              }`}
-            >
+            {/* Ink, not pos/neg: green or red on a saturated pastel lands at
+                about 2:1 contrast. The caption below carries the direction,
+                which is how the friend cards already read. */}
+            <span className="num block text-[16.5px] text-ink">
               {money(Math.abs(group.net), currency)}
             </span>
             <span className="newq block text-[11.5px]">

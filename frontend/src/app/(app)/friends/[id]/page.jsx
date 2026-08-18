@@ -36,6 +36,7 @@ import { ConfirmSheet } from '@/components/ui/Sheet';
 import { useToast } from '@/components/ui/Toast';
 import { useApp } from '@/store/AppContext';
 import { balanceBetween, isInvolved, shareOf } from '@/lib/balances';
+import FxNote from '@/components/ui/FxNote';
 import { categoryOf } from '@/lib/categories';
 import { money, firstName, relativeTime, dayLabel } from '@/lib/format';
 
@@ -76,10 +77,14 @@ function SharedExpenseRow({ expense, onDelete }) {
   const { net } = shareOf(expense, me?.id);
   const group = groups.find((g) => g.id === expense.groupId);
 
+  // One expense is exact in the currency it was recorded in — showing a €40
+  // dinner under the viewer's ₹ symbol would misstate it outright.
+  const own = expense.currency || currency;
+
   const sub = [
     isMe
-      ? `You paid ${money(expense.amount, currency)}`
-      : `${firstName(payer.name)} paid ${money(expense.amount, currency)}`,
+      ? `You paid ${money(expense.amount, own)}`
+      : `${firstName(payer.name)} paid ${money(expense.amount, own)}`,
     group ? group.name : null,
     dayLabel(expense.date),
   ]
@@ -104,7 +109,7 @@ function SharedExpenseRow({ expense, onDelete }) {
                   className={`num block text-[15px] 
                     ${net > 0 ? 'text-pos' : 'text-neg'}`}
                 >
-                  {money(Math.abs(net), currency)}
+                  {money(Math.abs(net), own)}
                 </span>
                 <span className="newq block text-[11.5px]">{net > 0 ? 'you lent' : 'you owe'}</span>
               </>
@@ -280,6 +285,7 @@ export default function FriendDetailPage() {
                 </Badge>
               </span>
             </Card>
+            <FxNote className="mt-2" />
           </motion.section>
 
           {/* --------------------------------------------------- actions */}
@@ -399,11 +405,11 @@ export default function FriendDetailPage() {
                         </span>
                       }
                       sublabel={`${relativeTime(s.date)}${s.note ? ` · ${s.note}` : ''}`}
-                      value={money(s.amount, currency)}
+                      value={money(s.amount, s.currency || currency)}
                       trailing={
                         <RowMenu
                           title="Payment"
-                          subtitle={`${money(s.amount, currency)} · ${relativeTime(s.date)}`}
+                          subtitle={`${money(s.amount, s.currency || currency)} · ${relativeTime(s.date)}`}
                           deleteLabel="Delete payment"
                           onDelete={() => setPendingPayment(s)}
                           className="-mr-1.5"
@@ -471,7 +477,7 @@ export default function FriendDetailPage() {
         title="Delete this payment?"
         body={
           pendingPayment
-            ? `Reversing ${money(pendingPayment.amount, currency)} will change your balance with ${firstName(person.name)}.`
+            ? `Reversing ${money(pendingPayment.amount, pendingPayment.currency || currency)} will change your balance with ${firstName(person.name)}.`
             : ''
         }
         confirmLabel="Delete"

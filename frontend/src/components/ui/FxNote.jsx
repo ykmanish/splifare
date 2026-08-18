@@ -26,18 +26,17 @@ export default function FxNote({ scope = undefined, className = '' }) {
       style={stale ? { color: 'var(--warn)' } : undefined}
     >
       <Icon size={12} strokeWidth={2.3} className="mt-0.5 shrink-0" />
+      {/* One template literal rather than mixed JSX text and expressions:
+          JSX trims whitespace around an embedded expression at a line break,
+          which silently ate the space in "converted to INR at". */}
       <span>
-        {stale ? (
-          <>
-            Mixed currencies, and live rates are unavailable — this total may be off
-            {fx.date ? ` (last rates ${fx.date})` : ''}.
-          </>
-        ) : (
-          <>
-            Mixed currencies, converted to {currency} at today&apos;s rate
-            {fx.date ? ` (${fx.date})` : ''}. Each expense stays exact in its own.
-          </>
-        )}
+        {stale
+          ? `Mixed currencies, and live rates are unavailable — this total may be off${
+              fx.date ? ` (last rates ${fx.date})` : ''
+            }.`
+          : `Mixed currencies, converted to ${currency} at today's rate${
+              fx.date ? ` (${fx.date})` : ''
+            }. Each expense stays exact in its own.`}
       </span>
     </p>
   );

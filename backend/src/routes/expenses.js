@@ -2,7 +2,7 @@ const express = require('express');
 const { Expense, Group } = require('../models');
 const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
-const { round2, splitsBalance } = require('../utils/money');
+const { round2, splitsBalance, formatMoney } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
 const { assertReachable } = require('../utils/people');
 
@@ -91,11 +91,13 @@ router.post(
       'an expense',
     );
 
+    const currency = String(req.body.currency || req.user.currency || 'INR').toUpperCase();
+
     const expense = await Expense.create({
       group: group?._id || null,
       description,
       amount,
-      currency: req.body.currency || req.user.currency,
+      currency,
       category: req.body.category || 'other',
       paidBy,
       splits,
@@ -113,7 +115,7 @@ router.post(
       actor: req.userId,
       type: 'expense_added',
       title: `${req.user.name} added an expense`,
-      body: `“${description}” · ${amount}${group ? ` in ${group.name}` : ''}`,
+      body: `“${description}” · ${formatMoney(amount, currency)}${group ? ` in ${group.name}` : ''}`,
       entityType: group ? 'group' : 'expense',
       entityId: String(group?._id || expense._id),
     });
@@ -125,6 +127,7 @@ router.post(
         ? `**${req.user.name}** added **${description}** in **${group.name}**`
         : `**${req.user.name}** added **${description}**`,
       amount,
+      currency,
       entityType: group ? 'group' : 'expense',
       entityId: String(group?._id || expense._id),
     });
@@ -180,7 +183,7 @@ router.patch(
       actor: req.userId,
       type: 'expense_updated',
       title: `${req.user.name} edited an expense`,
-      body: `“${description}” is now ${amount}`,
+      body: `“${description}” is now ${formatMoney(amount, expense.currency)}`,
       entityType: 'expense',
       entityId: String(expense._id),
     });
@@ -199,7 +202,7 @@ router.delete(
     }
 
     const audience = expense.participants.map(String);
-    const { description, amount } = expense;
+    const { description, amount, currency } = expense;
     await expense.deleteOne();
 
     await logActivity({
@@ -208,6 +211,7 @@ router.delete(
       type: 'expense_deleted',
       text: `**${req.user.name}** deleted **${description}**`,
       amount,
+      currency,
       entityType: 'expense',
       entityId: String(req.params.id),
     });

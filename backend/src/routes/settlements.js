@@ -2,7 +2,7 @@ const express = require('express');
 const { Settlement, User } = require('../models');
 const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
-const { round2 } = require('../utils/money');
+const { round2, formatMoney } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
 const { canTransactWith } = require('../utils/people');
 
@@ -48,11 +48,13 @@ router.post(
     const other = await User.findById(otherId);
     if (!other) throw new HttpError(404, 'That person no longer exists');
 
+    const currency = String(req.body.currency || req.user.currency || 'INR').toUpperCase();
+
     const settlement = await Settlement.create({
       from,
       to,
       amount,
-      currency: String(req.body.currency || req.user.currency || 'INR').toUpperCase(),
+      currency,
       group: req.body.groupId || null,
       note: String(req.body.note || '').trim(),
       date: req.body.date ? new Date(req.body.date) : new Date(),
@@ -65,7 +67,7 @@ router.post(
       actor: req.userId,
       type: 'settle',
       title: iPaid
-        ? `${req.user.name} paid you ${amount}`
+        ? `${req.user.name} paid you ${formatMoney(amount, currency)}`
         : `${req.user.name} recorded your payment`,
       body: settlement.note || 'Balance updated.',
       entityType: 'friend',
@@ -79,6 +81,7 @@ router.post(
         ? `**${req.user.name}** paid **${other.name}**`
         : `**${other.name}** paid **${req.user.name}**`,
       amount,
+      currency,
       entityType: 'friend',
       entityId: String(other._id),
     });

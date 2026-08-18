@@ -10,9 +10,10 @@ import Sheet from './Sheet';
 /* ---------------------------------------------------------- surfaces */
 
 /**
- * White cards on a cool grey canvas, with the near-black panel as the hero
- * surface and lime reserved for the accent. Tints stay quiet so lime and
- * black carry the design.
+ * Six saturated pastel colour-blocks on a warm paper canvas, with the
+ * near-black panel as the hero surface and lime reserved for the one action
+ * on a screen that must be pressed. The pastels carry the design; white is
+ * for dense list rows where colour would fight the content.
  */
 const TONES = {
   white: 'bg-surface text-ink',
@@ -23,7 +24,7 @@ const TONES = {
   /* Lime — use sparingly, for the one accent surface */
   lime: 'bg-brand text-on-brand',
   limeSoft: 'bg-brand-soft text-ink',
-  /* Quiet state tints */
+  /* The six pastel colour-blocks, at full strength */
   mint: 'bg-mint text-ink',
   mintSoft: 'bg-mint-soft text-ink',
   blush: 'bg-blush text-ink',
@@ -31,16 +32,27 @@ const TONES = {
   sky: 'bg-sky text-ink',
   skySoft: 'bg-sky-soft text-ink',
   grape: 'bg-grape text-ink',
-  /* Kept as aliases so older markup keeps rendering a real surface */
-  butter: 'bg-surface text-ink',
+  grapeSoft: 'bg-grape-soft text-ink',
+  butter: 'bg-butter text-ink',
   butterSoft: 'bg-butter-soft text-ink',
+  peach: 'bg-peach text-ink',
+  peachSoft: 'bg-peach-soft text-ink',
+  /* Older markup called the violet block "lavender" */
   lavender: 'bg-grape text-ink',
   lavenderSoft: 'bg-grape-soft text-ink',
   coral: 'bg-coral text-on-coral',
 };
 
-/** Rotate quiet tints across a list so consecutive cards differ. */
-export const TONE_CYCLE = ['white', 'soft', 'white', 'soft'];
+/**
+ * NOTE: put amounts on a pastel card in `text-ink`, never `text-pos` /
+ * `text-neg` — the semantic green and red land at roughly 2:1 and 3:1 against
+ * these fills, both under WCAG AA. State the direction in a caption instead.
+ *
+ * Rotate the pastels across a list so no two neighbours share a colour.
+ * Six long and co-prime with the 2-column grids, so the groups page never
+ * lines two identical fills up side by side either.
+ */
+export const TONE_CYCLE = ['grape', 'mint', 'butter', 'sky', 'blush', 'peach'];
 export const cycleTone = (i) => TONE_CYCLE[i % TONE_CYCLE.length];
 
 /** Flat card — no border, no shadow. `tone` picks a pastel fill. */

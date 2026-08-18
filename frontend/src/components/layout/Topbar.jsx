@@ -10,9 +10,20 @@ import { useApp } from '@/store/AppContext';
 import { firstName } from '@/lib/format';
 
 /**
+ * Called at render, not hoisted to a constant: the app is a long-lived SPA and
+ * a greeting baked at load would still say "Good morning" at dinner.
+ */
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/**
  * Sticky solid chrome at the top of every screen.
  *
- * No title  → avatar left, "Welcome back," over the first name.
+ * No title  → avatar left, a time-aware greeting over the first name.
  * With title → back IconCircle (or the avatar) left, centred title.
  * Always     → the screen's own actions, then the bell with its unread dot.
  *
@@ -49,7 +60,7 @@ export default function Topbar({ title, subtitle, back, right, onOpenNotificatio
           </div>
         ) : (
           <div className="min-w-0">
-            <p className="newq text-[12.5px] leading-tight">Welcome back,</p>
+            <p className="newq text-[12.5px] leading-tight">{greeting()} 👋</p>
             <p className="newq  text-ink truncate text-[16px] leading-tight">
               {firstName(me?.name || '')}
             </p>

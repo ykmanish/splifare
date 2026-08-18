@@ -11,6 +11,8 @@ import {
   UsersRound,
   Check,
   Sparkles,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from 'lucide-react';
 import Page from '@/components/layout/Page';
 import { useUI } from '@/components/layout/AppShell';
@@ -31,6 +33,7 @@ import { useToast } from '@/components/ui/Toast';
 import { categoryOf } from '@/lib/categories';
 import { money, firstName, CURRENCIES } from '@/lib/format';
 import { isInvolved, shareOf } from '@/lib/balances';
+import FxNote from '@/components/ui/FxNote';
 
 const EASE = [0.16, 1, 0.3, 1];
 const SPRING = { type: 'spring', damping: 26, stiffness: 320 };
@@ -79,6 +82,7 @@ export default function DashboardPage() {
     deleteList,
     deleteGroup,
     removeFriend,
+    convert,
   } = useApp();
   const { openExpense, editExpense, openSettle } = useUI();
   const { toast } = useToast();
@@ -105,9 +109,14 @@ export default function DashboardPage() {
 
   const myExpenses = expenses.filter((e) => isInvolved(e, me.id));
   const activeLists = lists.filter((l) => l.status !== 'completed');
+  // A sum across expenses, so each term has to be normalised first —
+  // otherwise a €40 dinner adds 40 to a rupee total.
   const monthTotal = expenses
     .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
-    .reduce((a, e) => a + (e.splits.find((s) => s.userId === me.id)?.amount || 0), 0);
+    .reduce(
+      (a, e) => a + convert(e.splits.find((s) => s.userId === me.id)?.amount || 0, e.currency),
+      0,
+    );
 
   const feed = myExpenses
     .filter((e) => {
@@ -140,6 +149,13 @@ export default function DashboardPage() {
   const peak = Math.max(monthTotal, overview.owed, overview.owe, 1);
   const pctOf = (v) => (v / peak) * 100;
 
+  /* The hero splits the figure so the decimals can recede — a big number
+     reads faster when the part that rarely matters is quieter. */
+  const heroAmount = money(Math.abs(overview.net), currency);
+  const heroSplit = heroAmount.match(/^(.*?)([.,]\d{2})$/);
+  const heroWhole = heroSplit ? heroSplit[1] : heroAmount;
+  const heroCents = heroSplit ? heroSplit[2] : '';
+
   const tiles = [
     { id: 'add', label: 'Add', icon: Plus, tone: 'dark', onClick: () => openExpense() },
     { id: 'settle', label: 'Settle', icon: Wallet, onClick: () => openSettle() },
@@ -150,47 +166,49 @@ export default function DashboardPage() {
   return (
     <Page>
       <div className="space-y-6">
-        {/* --------------------------------------------- greeting */}
-        <Section className="px-1.5">
-          <p className="newq text-[13.5px]">Hello {firstName(me?.name)}</p>
-          <h1 className="newq  text-ink mt-1 text-[25px] font-bold small leading-tight">{headline}</h1>
-        </Section>
-
         {/* --------------------------------------------- hero */}
         <Section delay={0.04}>
-          <Card tone="white" pad={false} className="p-5">
-            <p className="newq text-[12.5px] font-bold small">Total balance</p>
-            <p className="num mt-1.5 text-[40px]  leading-none text-ink">
-              {money(Math.abs(overview.net), currency)}
-            </p>
-            <p className="newq mt-2 text-[12.5px]">
-              {settledNet
-                ? 'Everyone is square — nothing outstanding.'
-                : overview.net > 0
-                  ? 'Net coming back to you across all splits.'
-                  : 'Net you still owe across all splits.'}
+          <Card tone="grape" pad={false} className="px-5 pb-5 pt-6">
+            <p className="newq text-[11.5px] uppercase tracking-[0.09em] text-ink-3">
+              {settledNet ? 'All settled' : overview.net > 0 ? 'You are owed' : 'You owe'}
             </p>
 
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              <div className="rounded-[16px] bg-surface-2 px-4 py-3">
-                <p className="newq text-[11.5px]">Owed to you</p>
-                <p className="num mt-0.5 text-[17px]  text-pos">
+            <p className="num mt-2 text-[44px] leading-none text-ink">
+              {heroWhole}
+              {heroCents && <span className="text-ink-3">{heroCents}</span>}
+            </p>
+
+            <p className="newq mt-2.5 text-[12.5px]">{headline}</p>
+
+            {/* Two white discs on the pastel, the way the reference splits a
+                balance into its two directions. */}
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <div className="rounded-[18px] bg-white/70 px-4 py-3">
+                <span className="flex items-center gap-1.5">
+                  <ArrowDownLeft size={13} strokeWidth={2.5} className="text-pos" />
+                  <span className="newq text-[11.5px]">Owed to you</span>
+                </span>
+                <p className="num mt-1 truncate text-[18px] text-ink">
                   {money(overview.owed, currency)}
                 </p>
               </div>
-              <div className="rounded-[16px] bg-surface-2 px-4 py-3">
-                <p className="newq text-[11.5px]">You owe</p>
-                <p className="num mt-0.5 text-[17px]  text-neg">
+              <div className="rounded-[18px] bg-white/70 px-4 py-3">
+                <span className="flex items-center gap-1.5">
+                  <ArrowUpRight size={13} strokeWidth={2.5} className="text-neg" />
+                  <span className="newq text-[11.5px]">You owe</span>
+                </span>
+                <p className="num mt-1 truncate text-[18px] text-ink">
                   {money(overview.owe, currency)}
                 </p>
               </div>
             </div>
           </Card>
+          <FxNote className="mt-2" />
         </Section>
 
         {/* --------------------------------------------- metrics */}
         <Section delay={0.08}>
-          <Card tone="white" pad={false} className="p-5">
+          <Card tone="butter" pad={false} className="p-5">
             <MetricRow
               stats={[
                 {
@@ -235,6 +253,9 @@ export default function DashboardPage() {
                 const share = shareOf(e, me.id);
                 const settled = Math.abs(share.net) < 0.005;
                 const ways = e.splits?.length || 0;
+                // Exact figures for a single row stay in the currency it was
+                // recorded in; only the aggregates above get converted.
+                const own = e.currency || currency;
 
                 return (
                   <FieldRow
@@ -244,7 +265,7 @@ export default function DashboardPage() {
                     iconBg={`color-mix(in srgb, ${cat.tint} 16%, transparent)`}
                     label={e.description}
                     sublabel={`Paid by ${payerLabel(e)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
-                    value={money(share.owed, currency)}
+                    value={money(share.owed, own)}
                     trailing={
                       <span className="flex shrink-0 items-center gap-1.5">
                         {settled && (
@@ -266,7 +287,7 @@ export default function DashboardPage() {
                           editLabel="Edit bill"
                           deleteLabel="Delete bill"
                           title={e.description}
-                          subtitle={`${money(e.amount, currency)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
+                          subtitle={`${money(e.amount, own)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
                           extra={
                             !settled && share.net < 0 ? (
                               <button

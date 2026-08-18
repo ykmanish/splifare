@@ -183,7 +183,9 @@ export default function GroupDetailPage() {
     const nets = netByMember(ledger, group.memberIds);
     const transfers = simplify(nets);
     const groupExpenses = expenses.filter((e) => e.groupId === group.id);
-    const total = groupExpenses.reduce((a, e) => a + e.amount, 0);
+    // Converted, because this sums across expenses that may each be in a
+    // different currency.
+    const total = groupExpenses.reduce((a, e) => a + convert(e.amount, e.currency), 0);
     return { ledger, mine, nets, transfers, groupExpenses, total };
   }, [group, expenses, settlements, me, convert]);
 
@@ -555,7 +557,10 @@ export default function GroupDetailPage() {
                               avatar={<Avatar person={p} size="sm" />}
                               label={p.id === me.id ? 'You' : p.name}
                               value={square ? 'settled' : money(Math.abs(n), currency)}
-                              tone={square ? 'muted' : n > 0 ? 'pos' : 'neg'}
+                              /* Same reason as the group tiles: these rows sit
+                                 on a pastel, where pos/neg fails contrast. The
+                                 `hint` below states the direction. */
+                              tone={square ? 'muted' : 'default'}
                               strong={!square}
                               hint={square ? undefined : n > 0 ? 'is owed' : 'owes the group'}
                             />
@@ -848,7 +853,7 @@ export default function GroupDetailPage() {
         title="Delete this expense?"
         body={
           deletingExpense
-            ? `${deletingExpense.description} · ${money(deletingExpense.amount, currency)} will be removed and balances recalculated.`
+            ? `${deletingExpense.description} · ${money(deletingExpense.amount, deletingExpense.currency || currency)} will be removed and balances recalculated.`
             : undefined
         }
         confirmLabel="Delete expense"
