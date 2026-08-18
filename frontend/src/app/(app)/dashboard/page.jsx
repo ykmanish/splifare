@@ -1,0 +1,478 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  Plus,
+  Wallet,
+  ShoppingBasket,
+  UsersRound,
+  Check,
+  Sparkles,
+} from 'lucide-react';
+import Page from '@/components/layout/Page';
+import { useUI } from '@/components/layout/AppShell';
+import { useApp } from '@/store/AppContext';
+import Button from '@/components/ui/Button';
+import { Badge, Card, EmptyState, RowMenu } from '@/components/ui/Bits';
+import {
+  ActionTiles,
+  FieldRow,
+  GroupLabel,
+  ListGroup,
+  MetricRow,
+  PersonRow,
+} from '@/components/ui/Blocks';
+import { Pills } from '@/components/ui/Controls';
+import { ConfirmSheet } from '@/components/ui/Sheet';
+import { useToast } from '@/components/ui/Toast';
+import { categoryOf } from '@/lib/categories';
+import { money, firstName, CURRENCIES } from '@/lib/format';
+import { isInvolved, shareOf } from '@/lib/balances';
+
+const EASE = [0.16, 1, 0.3, 1];
+const SPRING = { type: 'spring', damping: 26, stiffness: 320 };
+
+function Section({ children, delay = 0, className = '' }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: EASE, delay }}
+      className={className}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+const MoreLink = ({ href, children = 'See all' }) => (
+  <Link href={href} className="newq text-[12.5px] tap hover:text-ink">
+    {children}
+  </Link>
+);
+
+/* An emoji standing in for a lucide icon inside a FieldRow tile. */
+const emojiIcon = (char) => {
+  const EmojiTile = () => <span className="text-[16px] leading-none">{char}</span>;
+  return EmojiTile;
+};
+
+const TABS = [
+  { id: 'recent', label: 'Recent' },
+  { id: 'owe', label: 'You owe' },
+  { id: 'owed', label: 'Owed to you' },
+];
+
+export default function DashboardPage() {
+  const {
+    me,
+    overview,
+    personById,
+    currency,
+    expenses,
+    lists,
+    groups,
+    deleteExpense,
+    deleteList,
+    deleteGroup,
+    removeFriend,
+  } = useApp();
+  const { openExpense, editExpense, openSettle } = useUI();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const [tab, setTab] = useState('recent');
+  const [confirm, setConfirm] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const ask = (cfg) => {
+    setConfirm(cfg);
+    setConfirmOpen(true);
+  };
+
+  const run = async (fn, failTitle) => {
+    try {
+      await fn();
+    } catch (err) {
+      toast({ tone: 'error', title: failTitle, description: err.message });
+    }
+  };
+
+  /* -------------------------------------------------- computations */
+
+  const myExpenses = expenses.filter((e) => isInvolved(e, me.id));
+  const activeLists = lists.filter((l) => l.status !== 'completed');
+  const monthTotal = expenses
+    .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+    .reduce((a, e) => a + (e.splits.find((s) => s.userId === me.id)?.amount || 0), 0);
+
+  const feed = myExpenses
+    .filter((e) => {
+      if (tab === 'owe') return shareOf(e, me.id).net < -0.005;
+      if (tab === 'owed') return shareOf(e, me.id).net > 0.005;
+      return true;
+    })
+    .slice(0, 5);
+
+  const settledNet = Math.abs(overview.net) < 0.005;
+  const headline = settledNet
+    ? 'Everything is settled up.'
+    : overview.net > 0
+      ? 'Your friends still owe you.'
+      : 'A few bills need settling.';
+
+  const payTargetOf = (expense) => {
+    const other = (expense.paidBy || []).find((p) => p.userId !== me.id);
+    return { withUserId: other?.userId, groupId: expense.groupId || undefined };
+  };
+
+  const payerLabel = (expense) => {
+    const ids = (expense.paidBy || []).map((p) => p.userId);
+    if (!ids.length) return 'Nobody';
+    const first = ids[0] === me.id ? 'You' : firstName(personById(ids[0])?.name || 'Someone');
+    return ids.length > 1 ? `${first} +${ids.length - 1}` : first;
+  };
+
+  /* Bars are relative to whichever figure is biggest. */
+  const peak = Math.max(monthTotal, overview.owed, overview.owe, 1);
+  const pctOf = (v) => (v / peak) * 100;
+
+  const tiles = [
+    { id: 'add', label: 'Add', icon: Plus, tone: 'dark', onClick: () => openExpense() },
+    { id: 'settle', label: 'Settle', icon: Wallet, onClick: () => openSettle() },
+    { id: 'list', label: 'List', icon: ShoppingBasket, href: '/lists?new=1' },
+    { id: 'group', label: 'Group', icon: UsersRound, href: '/groups?new=1' },
+  ];
+
+  return (
+    <Page>
+      <div className="space-y-6">
+        {/* --------------------------------------------- greeting */}
+        <Section className="px-1.5">
+          <p className="newq text-[13.5px]">Hello {firstName(me?.name)}</p>
+          <h1 className="newq  text-ink mt-1 text-[25px] font-bold small leading-tight">{headline}</h1>
+        </Section>
+
+        {/* --------------------------------------------- hero */}
+        <Section delay={0.04}>
+          <Card tone="white" pad={false} className="p-5">
+            <p className="newq text-[12.5px] font-bold small">Total balance</p>
+            <p className="num mt-1.5 text-[40px]  leading-none text-ink">
+              {money(Math.abs(overview.net), currency)}
+            </p>
+            <p className="newq mt-2 text-[12.5px]">
+              {settledNet
+                ? 'Everyone is square — nothing outstanding.'
+                : overview.net > 0
+                  ? 'Net coming back to you across all splits.'
+                  : 'Net you still owe across all splits.'}
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <div className="rounded-[16px] bg-surface-2 px-4 py-3">
+                <p className="newq text-[11.5px]">Owed to you</p>
+                <p className="num mt-0.5 text-[17px]  text-pos">
+                  {money(overview.owed, currency)}
+                </p>
+              </div>
+              <div className="rounded-[16px] bg-surface-2 px-4 py-3">
+                <p className="newq text-[11.5px]">You owe</p>
+                <p className="num mt-0.5 text-[17px]  text-neg">
+                  {money(overview.owe, currency)}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </Section>
+
+        {/* --------------------------------------------- metrics */}
+        <Section delay={0.08}>
+          <Card tone="white" pad={false} className="p-5">
+            <MetricRow
+              stats={[
+                {
+                  label: 'This month',
+                  value: money(monthTotal, currency, { compact: true }),
+                  tone: 'brand',
+                  pct: pctOf(monthTotal),
+                },
+                {
+                  label: 'Owed to you',
+                  value: money(overview.owed, currency, { compact: true }),
+                  tone: 'pos',
+                  pct: pctOf(overview.owed),
+                },
+                {
+                  label: 'You owe',
+                  value: money(overview.owe, currency, { compact: true }),
+                  tone: 'neg',
+                  pct: pctOf(overview.owe),
+                },
+              ]}
+            />
+          </Card>
+        </Section>
+
+        {/* --------------------------------------------- quick actions */}
+        <Section delay={0.12}>
+          <ActionTiles actions={tiles} />
+        </Section>
+
+        {/* --------------------------------------------- bills */}
+        <Section delay={0.16}>
+          <GroupLabel action={<MoreLink href="/activity">Activity</MoreLink>}>Bills</GroupLabel>
+
+          <Pills options={TABS} value={tab} onChange={setTab} size="sm" className="mb-2.5" />
+
+          {feed.length ? (
+            <ListGroup>
+              {feed.map((e) => {
+                const cat = categoryOf(e.category);
+                const Icon = e.listId ? ShoppingBasket : cat.icon;
+                const share = shareOf(e, me.id);
+                const settled = Math.abs(share.net) < 0.005;
+                const ways = e.splits?.length || 0;
+
+                return (
+                  <FieldRow
+                    key={e.id}
+                    icon={Icon}
+                    iconTint={cat.tint}
+                    iconBg={`color-mix(in srgb, ${cat.tint} 16%, transparent)`}
+                    label={e.description}
+                    sublabel={`Paid by ${payerLabel(e)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
+                    value={money(share.owed, currency)}
+                    trailing={
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {settled && (
+                          <Badge tone="pos" icon={Check}>
+                            Paid
+                          </Badge>
+                        )}
+                        <RowMenu
+                          onEdit={() => editExpense(e)}
+                          onDelete={() =>
+                            ask({
+                              title: 'Delete this bill?',
+                              body: `“${e.description}” will be removed for everyone it was split with.`,
+                              confirmLabel: 'Delete bill',
+                              action: () =>
+                                run(() => deleteExpense(e.id), 'Could not delete the bill'),
+                            })
+                          }
+                          editLabel="Edit bill"
+                          deleteLabel="Delete bill"
+                          title={e.description}
+                          subtitle={`${money(e.amount, currency)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
+                          extra={
+                            !settled && share.net < 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => openSettle(payTargetOf(e))}
+                                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5
+                                  text-left text-ink tap hover:bg-surface-2 active:scale-[0.985]"
+                              >
+                                <Wallet size={19} strokeWidth={2.1} />
+                                <span className="newq  text-ink text-[15px]">Settle this up</span>
+                              </button>
+                            ) : null
+                          }
+                        />
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </ListGroup>
+          ) : (
+            <Card pad={false}>
+              <EmptyState
+                icon={Sparkles}
+                title={tab === 'recent' ? 'No bills yet' : 'Nothing here'}
+                body={
+                  tab === 'recent'
+                    ? 'Add the first one and Splitta works out who owes what.'
+                    : 'Switch tabs, or add a bill to get this moving.'
+                }
+                action={
+                  <Button variant="dark" icon={Plus} onClick={() => openExpense()}>
+                    Add a bill
+                  </Button>
+                }
+              />
+            </Card>
+          )}
+        </Section>
+
+        {/* --------------------------------------------- shopping */}
+        {activeLists.length > 0 && (
+          <Section delay={0.2}>
+            <GroupLabel action={<MoreLink href="/lists">All lists</MoreLink>}>Shopping</GroupLabel>
+
+            <ListGroup>
+              {activeLists.map((l) => {
+                const done = l.items.filter((i) => i.checked).length;
+                const spent = l.items.reduce((a, i) => a + (Number(i.price) || 0), 0);
+
+                return (
+                  <FieldRow
+                    key={l.id}
+                    icon={emojiIcon(l.emoji)}
+                    label={l.name}
+                    sublabel={`${done}/${l.items.length} picked${l.store ? ` · ${l.store}` : ''}`}
+                    value={money(spent, currency)}
+                    href={l.status === 'shopping' ? `/lists/${l.id}/shop` : `/lists/${l.id}`}
+                    trailing={
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {l.status === 'shopping' && <Badge tone="brandSoft">Live</Badge>}
+                        <RowMenu
+                          onEdit={() => router.push(`/lists/${l.id}`)}
+                          onDelete={() =>
+                            ask({
+                              title: 'Delete this list?',
+                              body: `“${l.name}” and everything on it will be removed.`,
+                              confirmLabel: 'Delete list',
+                              action: () => run(() => deleteList(l.id), 'Could not delete the list'),
+                            })
+                          }
+                          editLabel="Open list"
+                          deleteLabel="Delete list"
+                          title={l.name}
+                          subtitle={`${l.items.length} items`}
+                        />
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </ListGroup>
+          </Section>
+        )}
+
+        {/* --------------------------------------------- people */}
+        {overview.rows.length > 0 && (
+          <Section delay={0.24}>
+            <GroupLabel action={<MoreLink href="/friends" />}>People</GroupLabel>
+
+            <ListGroup>
+              {overview.rows.slice(0, 4).map((r) => {
+                const p = personById(r.userId);
+                const positive = r.amount > 0;
+
+                return (
+                  <PersonRow
+                    key={r.userId}
+                    person={p}
+                    name={firstName(p?.name)}
+                    sublabel={positive ? 'owes you' : 'you owe'}
+                    trailing={
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span
+                          className={`num text-[15px]  ${positive ? 'text-pos' : 'text-neg'}`}
+                        >
+                          {money(Math.abs(r.amount), currency)}
+                        </span>
+                        <Button
+                          size="xs"
+                          variant={positive ? 'soft' : 'dark'}
+                          onClick={() => openSettle({ withUserId: r.userId })}
+                        >
+                          {positive ? 'Remind' : 'Pay'}
+                        </Button>
+                        <RowMenu
+                          onEdit={() => router.push(`/friends/${r.userId}`)}
+                          onDelete={() =>
+                            ask({
+                              title: `Remove ${firstName(p?.name)}?`,
+                              body: 'They will be taken off your friends list. Shared history stays.',
+                              confirmLabel: 'Remove',
+                              action: () =>
+                                run(() => removeFriend(r.userId), 'Could not remove this friend'),
+                            })
+                          }
+                          editLabel="Open profile"
+                          deleteLabel="Remove friend"
+                          className="-mr-2"
+                          title={p?.name}
+                          subtitle={
+                            positive
+                              ? `Owes you ${money(Math.abs(r.amount), currency)}`
+                              : `You owe ${money(Math.abs(r.amount), currency)}`
+                          }
+                        />
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </ListGroup>
+          </Section>
+        )}
+
+        {/* --------------------------------------------- groups */}
+        {groups.length > 0 && (
+          <Section delay={0.28}>
+            <GroupLabel action={<MoreLink href="/groups">All groups</MoreLink>}>Groups</GroupLabel>
+
+            <ListGroup>
+              {groups.slice(0, 4).map((g) => (
+                <FieldRow
+                  key={g.id}
+                  icon={emojiIcon(g.emoji)}
+                  label={g.name}
+                  sublabel={`${g.memberIds.length} members`}
+                  href={`/groups/${g.id}`}
+                  trailing={
+                    <RowMenu
+                      onEdit={() => router.push(`/groups/${g.id}`)}
+                      onDelete={() =>
+                        ask({
+                          title: 'Delete this group?',
+                          body: `“${g.name}” and its shared history will be removed for everyone.`,
+                          confirmLabel: 'Delete group',
+                          action: () => run(() => deleteGroup(g.id), 'Could not delete the group'),
+                        })
+                      }
+                      editLabel="Open group"
+                      deleteLabel="Delete group"
+                      title={g.name}
+                      subtitle={`${g.memberIds.length} members`}
+                    />
+                  }
+                />
+              ))}
+            </ListGroup>
+          </Section>
+        )}
+
+        {/* --------------------------------------------- primary CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32, ...SPRING }}
+        >
+          <Button block size="lg" icon={Plus} onClick={() => openExpense()}>
+            Add an expense
+          </Button>
+          <p className="newq mt-3 text-center text-[12.5px]">
+            Splitta works out who owes what, down to the last{' '}
+            {(CURRENCIES[currency] || CURRENCIES.INR).symbol}1.
+          </p>
+        </motion.div>
+      </div>
+
+      <ConfirmSheet
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => confirm?.action?.()}
+        title={confirm?.title}
+        body={confirm?.body}
+        confirmLabel={confirm?.confirmLabel || 'Delete'}
+        danger
+      />
+    </Page>
+  );
+}

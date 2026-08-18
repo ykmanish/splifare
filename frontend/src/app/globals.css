@@ -1,0 +1,677 @@
+/* Google Sans for headings, Google Sans Text for body. Loaded from CSS rather
+   than a <link> in the tree, because React 19 hoists stylesheet links on the
+   client but not during SSR, which breaks hydration. */
+
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   SPLITTA — DESIGN TOKENS
+   Cool grey canvas · white cards · near-black hero panels · lime accent
+   ============================================================ */
+
+:root {
+  /* --- Surfaces --- */
+  --canvas: #e9ebec;
+  --canvas-accent: #e1e4e6;
+  --surface: #ffffff;
+  --surface-2: #f2f4f5;
+  --surface-3: #e7eaec;
+
+  /* Near-black panel — the hero surface */
+  --panel: #0b0c0d;
+  --panel-2: #1a1c1f;
+  --panel-3: #26282c;
+  --on-panel: #ffffff;
+  --on-panel-2: #9aa1a9;
+
+  --border: #e2e5e7;
+  --border-strong: #d0d5d8;
+
+  --text: #0b0c0d;
+  --text-2: #6f767e;
+  --text-3: #9aa1a9;
+  --text-inv: #ffffff;
+
+  /* --- Electric lime: the accent --- */
+  --lime-100: #f2fdcc;
+  --lime-200: #e8fc9e;
+  --lime-300: #dffa74;
+  --lime-400: #d4f84e;
+  --lime-500: #c2ec2c;
+  --lime-600: #a5cd12;
+
+  --brand: #d4f84e;
+  --brand-strong: #c2ec2c;
+  --brand-soft: #f0fdc9;
+  --on-brand: #0b0c0d;
+
+  --feature: #0b0c0d;
+  --feature-soft: #f0fdc9;
+  --on-feature: #ffffff;
+
+  /* --- Tonal fills: quiet, so lime and black stay the story --- */
+  --butter: #ffffff;
+  --butter-soft: #fdf6e2;
+  --butter-deep: #d98324;
+  --mint: #eaf7f1;
+  --mint-soft: #f3fbf7;
+  --mint-deep: #0fae74;
+  --blush: #fdecee;
+  --blush-soft: #fef5f6;
+  --sky: #eaf0fd;
+  --sky-soft: #f4f7fe;
+  --grape: #f0eefc;
+  --grape-soft: #f7f6fd;
+
+  /* --- Semantic --- */
+  --pos: #0fae74;
+  --pos-soft: #eaf7f1;
+  --neg: #e63946;
+  --neg-soft: #fdecee;
+  --warn: #d98324;
+  --warn-soft: #fdf3e5;
+  --info: #2f6df0;
+  --info-soft: #eaf0fd;
+  --violet: #6c5ce7;
+  --violet-soft: #f0eefc;
+
+  --coral: #e63946;
+  --coral-soft: #fdecee;
+  --on-coral: #ffffff;
+
+  --dot-food: #0fae74;
+  --dot-fun: #6c5ce7;
+  --dot-other: #d98324;
+
+  /* --- Elevation: cards are flat; only overlays float --- */
+  --sh-xs: none;
+  --sh-sm: none;
+  --sh-md: none;
+  --sh-lg: 0 16px 40px -12px rgba(11, 12, 13, 0.18);
+  --sh-xl: 0 -8px 55px -12px rgba(11, 12, 13, 0.2);
+  --sh-panel: 0 14px 34px -14px rgba(11, 12, 13, 0.45);
+  --sh-brand: 0 8px 22px -10px rgba(194, 236, 44, 0.75);
+
+  --ring: rgba(11, 12, 13, 0.16);
+}
+
+.dark {
+  --canvas: #08090a;
+  --canvas-accent: #0d0f10;
+  --surface: #121415;
+  --surface-2: #191c1e;
+  --surface-3: #212528;
+
+  --panel: #121415;
+  --panel-2: #191c1e;
+  --panel-3: #282c30;
+  --on-panel: #ffffff;
+  --on-panel-2: #8e959c;
+
+  --border: #232729;
+  --border-strong: #333940;
+
+  --text: #eef1f2;
+  --text-2: #99a1a8;
+  --text-3: #6b7279;
+  --text-inv: #0b0c0d;
+
+  --brand: #d4f84e;
+  --brand-strong: #c2ec2c;
+  --brand-soft: rgba(212, 248, 78, 0.14);
+  --on-brand: #0b0c0d;
+
+  --feature: #191c1e;
+  --feature-soft: rgba(212, 248, 78, 0.14);
+  --on-feature: #ffffff;
+
+  --butter: #121415;
+  --butter-soft: rgba(217, 131, 36, 0.15);
+  --butter-deep: #e8a44a;
+  --mint: rgba(46, 224, 165, 0.14);
+  --mint-soft: rgba(46, 224, 165, 0.09);
+  --mint-deep: #2ee0a5;
+  --blush: rgba(255, 107, 115, 0.14);
+  --blush-soft: rgba(255, 107, 115, 0.09);
+  --sky: rgba(95, 157, 255, 0.14);
+  --sky-soft: rgba(95, 157, 255, 0.09);
+  --grape: rgba(154, 140, 255, 0.15);
+  --grape-soft: rgba(154, 140, 255, 0.1);
+
+  --pos: #2ee0a5;
+  --pos-soft: rgba(46, 224, 165, 0.14);
+  --neg: #ff6b73;
+  --neg-soft: rgba(255, 107, 115, 0.14);
+  --warn: #f5a623;
+  --warn-soft: rgba(245, 166, 35, 0.14);
+  --info: #5f9dff;
+  --info-soft: rgba(95, 157, 255, 0.14);
+  --violet: #9a8cff;
+  --violet-soft: rgba(154, 140, 255, 0.15);
+
+  --coral: #ff6b73;
+  --coral-soft: rgba(255, 107, 115, 0.14);
+  --on-coral: #0b0c0d;
+
+  --sh-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.75);
+  --sh-xl: 0 -8px 55px -12px rgba(0, 0, 0, 0.75);
+  --sh-panel: 0 14px 34px -14px rgba(0, 0, 0, 0.7);
+  --sh-brand: 0 8px 22px -10px rgba(212, 248, 78, 0.3);
+
+  --ring: rgba(212, 248, 78, 0.32);
+}
+
+/* ============================================================
+   TAILWIND THEME BRIDGE  (inline = keeps var() so .dark swaps)
+   ============================================================ */
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-canvas-accent: var(--canvas-accent);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-panel-3: var(--panel-3);
+  --color-on-panel: var(--on-panel);
+  --color-on-panel-2: var(--on-panel-2);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-ink-3: var(--text-3);
+  --color-ink-inv: var(--text-inv);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+
+  --color-feature: var(--feature);
+  --color-feature-soft: var(--feature-soft);
+  --color-on-feature: var(--on-feature);
+
+  --color-lime-100: var(--lime-100);
+  --color-lime-200: var(--lime-200);
+  --color-lime-300: var(--lime-300);
+  --color-lime-400: var(--lime-400);
+  --color-lime-500: var(--lime-500);
+  --color-lime-600: var(--lime-600);
+
+  --color-butter: var(--butter);
+  --color-butter-soft: var(--butter-soft);
+  --color-butter-deep: var(--butter-deep);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-mint-deep: var(--mint-deep);
+  --color-blush: var(--blush);
+  --color-blush-soft: var(--blush-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-grape: var(--grape);
+  --color-grape-soft: var(--grape-soft);
+
+  --color-coral: var(--coral);
+  --color-coral-soft: var(--coral-soft);
+  --color-on-coral: var(--on-coral);
+
+  --color-dot-food: var(--dot-food);
+  --color-dot-fun: var(--dot-fun);
+  --color-dot-other: var(--dot-other);
+
+  --color-pos: var(--pos);
+  --color-pos-soft: var(--pos-soft);
+  --color-neg: var(--neg);
+  --color-neg-soft: var(--neg-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+
+  --shadow-xs: var(--sh-xs);
+  --shadow-sm: var(--sh-sm);
+  --shadow-md: var(--sh-md);
+  --shadow-lg: var(--sh-lg);
+  --shadow-xl: var(--sh-xl);
+  --shadow-panel: var(--sh-panel);
+  --shadow-brand: var(--sh-brand);
+
+  /* One face across the whole app — headings and body no longer differ. */
+  --font-sans: 'Google Sans Text', 'Google Sans', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+
+  /* Generous, pill-leaning radii */
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.375rem;
+  --radius-3xl: 1.75rem;
+  --radius-4xl: 2rem;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--text);
+  font-family: "newq";
+  font-weight: 400;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- ONE type class ---------------------------------------------
+   .newq is the only typography class in the app. Weight, size and
+   colour come from utilities on top of it, e.g.
+     <h2 className="newq  text-ink text-[17px]">
+
+   It lives in the components layer on purpose: an unlayered rule would
+   outrank Tailwind's utilities, so `text-on-panel` could never override
+   the class colour — that is what made the active tab label invisible.
+   ------------------------------------------------------------------ */
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.024em;
+    color: var(--text);
+  }
+}
+
+@layer components {
+  .newq {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    letter-spacing: -0.008em;
+  }
+
+  /* Money & any aligned numerals — same face, tabular figures */
+  .num {
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+    letter-spacing: -0.024em;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Only interactive chrome gets a ring — never bare inputs. */
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+[role='switch']:focus-visible,
+[role='slider']:focus-visible,
+[role='tab']:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+@utility glass {
+  background: color-mix(in srgb, var(--canvas) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+}
+
+@utility card {
+  background: var(--surface);
+  border-radius: var(--radius-3xl);
+}
+
+/* Phone-first: on anything wider we centre a phone-width column. */
+@utility phone {
+  width: 100%;
+  max-width: 440px;
+  margin-inline: auto;
+}
+
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+@utility mb-safe {
+  margin-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+@utility pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+@utility tap {
+  transition:
+    transform 0.18s var(--ease-out-quint),
+    background-color 0.18s var(--ease-out-quint),
+    box-shadow 0.18s var(--ease-out-quint),
+    opacity 0.18s var(--ease-out-quint);
+}
+
+/* Faint concentric rings on the near-black hero card */
+@utility rings {
+  background-image:
+    radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px),
+    radial-gradient(
+      circle at 78% 22%,
+      transparent 38px,
+      rgba(255, 255, 255, 0.05) 39px,
+      transparent 40px
+    ),
+    radial-gradient(
+      circle at 78% 22%,
+      transparent 62px,
+      rgba(255, 255, 255, 0.04) 63px,
+      transparent 64px
+    ),
+    radial-gradient(
+      circle at 78% 22%,
+      transparent 90px,
+      rgba(255, 255, 255, 0.03) 91px,
+      transparent 92px
+    );
+}
+
+@font-face {
+  font-family: "Regular";
+  src: url("./font/regular.otf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+@font-face {
+  font-family: "Gvibet";
+  src: url("./font/regular.otf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+@font-face {
+  font-family: "Starlight";
+  src: url("./font/arivo.ttf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+@font-face {
+  font-family: "Beboom";
+  src: url("./font/ovso.otf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+@font-face {
+  font-family: "Goodly";
+  src: url("./font/goodly.otf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("./font/satre.ttf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+@font-face {
+  font-family: "Rayton";
+  src: url("./font/rayton.ttf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+@font-face {
+  font-family: "count";
+  src: url("./font/Countless.ttf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+@font-face {
+  font-family: "logoz";
+  src: url("./font/Aminute.ttf") format("truetype");
+  /* Add additional font weights and styles if needed */
+}
+
+.test{
+  font-family: "logoz";
+}
+.newq {
+  font-family: "Geist";
+}
+.small {
+  font-family: "Regular";
+}
+
+.smallt {
+  font-family: "Gvibet";
+}
+
+.star {
+  font-family: "Starlight";
+}
+
+.good {
+  font-family: "Goodly";
+}
+
+.boom {
+  font-family: "Beboom";
+}
+
+.ray {
+  font-family: "Rayton";
+}
+
+.count{
+  font-family: "count";
+}
+
+/* ============================================================
+   ANIMATION
+   ============================================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.93);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s var(--ease-out-quint) both;
+}
+.animate-rise {
+  animation: rise 0.5s var(--ease-out-expo) both;
+}
+.animate-pop {
+  animation: pop 0.32s var(--ease-spring) both;
+}
+.animate-float {
+  animation: float-y 3.2s ease-in-out infinite;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--surface) 70%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+.stagger > * {
+  animation: rise 0.5s var(--ease-out-expo) both;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 0.11s;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 0.15s;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 0.19s;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 0.23s;
+}
+.stagger > *:nth-child(7) {
+  animation-delay: 0.27s;
+}
+.stagger > *:nth-child(8) {
+  animation-delay: 0.31s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
