@@ -23,20 +23,34 @@ const PORT = Number(process.env.PORT) || 5000;
 
 /* ------------------------------------------------------------ setup */
 
-const allowed = (process.env.CLIENT_URL || 'http://localhost:3000')
+const allowed = (
+  process.env.CLIENT_URL ||
+  'http://localhost:3000,https://split.nexarrow.eu'
+)
   .split(',')
-  .map((s) => s.trim());
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
     origin(origin, cb) {
-      // Allow same-origin/tooling requests that send no Origin header.
-      if (!origin || allowed.includes(origin)) return cb(null, true);
-      cb(new Error(`Origin ${origin} is not allowed`));
+      // Allow requests with no Origin header
+      // (Postman, server-to-server requests, etc.)
+      if (!origin) {
+        return cb(null, true);
+      }
+
+      if (allowed.includes(origin)) {
+        return cb(null, true);
+      }
+
+      return cb(new Error(`Origin ${origin} is not allowed`));
     },
+
     credentials: true,
-  }),
+  })
 );
+
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {

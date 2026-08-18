@@ -47,6 +47,13 @@ const userSchema = new Schema(
      * without knowing the email address, so it is safe to paste in a chat.
      */
     code: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
+    /**
+     * UPI virtual payment address, e.g. `name@okhdfcbank`. Lets a friend
+     * settle by opening their own UPI app instead of leaving for a bank
+     * transfer. Visible to confirmed friends only — it is a payment handle,
+     * so sharing a group must not be enough to learn it.
+     */
+    upiId: { type: String, default: '', trim: true, maxlength: 80 },
     /** Confirmed, mutual friendships only — requests live in FriendRequest. */
     friends: [ref('User')],
   },

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Bits';
 import { GroupLabel, ListGroup, FieldRow, PersonRow, SheetHeader } from '@/components/ui/Blocks';
 import { PersonToggle } from '@/components/ui/Avatar';
 import CodeBox from '@/components/ui/CodeBox';
+import { groupInviteLink } from '@/lib/invite';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { GROUP_TYPES, GROUP_EMOJIS } from '@/lib/categories';
@@ -134,6 +135,8 @@ export default function CreateGroupSheet({ open, onClose, onCreated }) {
               hint="Anyone with this code can join the group"
               shareTitle={`Join ${created.name} on Splitta`}
               shareText={`Join ${created.name} on Splitta — the room code is ${created.code}`}
+              qrValue={groupInviteLink(created.code)}
+              qrLabel={`QR code to join ${created.name}`}
             />
           </Section>
 

@@ -43,6 +43,7 @@ import {
   StatusPill,
 } from '@/components/ui/Blocks';
 import CodeBox from '@/components/ui/CodeBox';
+import { groupInviteLink } from '@/lib/invite';
 import FxNote from '@/components/ui/FxNote';
 import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
@@ -409,6 +410,8 @@ export default function GroupDetailPage() {
               hint="Share it and they can join without a friend request"
               shareTitle={`Join ${group.name} on Splitta`}
               shareText={`Join ${group.name} on Splitta — the room code is ${group.code}`}
+              qrValue={groupInviteLink(group.code)}
+              qrLabel={`QR code to join ${group.name}`}
             />
           </Section>
 
@@ -699,6 +702,8 @@ export default function GroupDetailPage() {
               hint="Rotate it if it ends up somewhere it should not be"
               shareTitle={`Join ${group.name} on Splitta`}
               shareText={`Join ${group.name} on Splitta — the room code is ${group.code}`}
+              qrValue={groupInviteLink(group.code)}
+              qrLabel={`QR code to join ${group.name}`}
               onRotate={onRotateCode}
               rotating={rotating}
             />

@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, ArrowDownLeft, ArrowUpRight, Scale, Wallet } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ExternalLink,
+  Scale,
+  Wallet,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import Sheet from '@/components/ui/Sheet';
 import StatusSheet from '@/components/ui/StatusSheet';
@@ -13,6 +20,7 @@ import Avatar from '@/components/ui/Avatar';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balanceBetween } from '@/lib/balances';
+import { buildUpiLink } from '@/lib/upi';
 import { money, firstName } from '@/lib/format';
 
 /** Section entrance — restrained, staggered by index. */
@@ -41,6 +49,8 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Set once their UPI app has been opened, so the copy can stop guessing. */
+  const [handedOff, setHandedOff] = useState(false);
 
   /* 'processing' | 'success' | null — the sheet stays open behind it. */
   const [status, setStatus] = useState(null);
@@ -92,6 +102,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
       setWithId(target);
       setGroupId(g);
       setNote('');
+      setHandedOff(false);
 
       if (target && me) {
         const led = buildLedger(expenses, settlements, g || undefined, convert);
@@ -126,6 +137,23 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const other = people.find((p) => p.id === withId);
   const total = Number(amount) || 0;
   const canSave = !!withId && total > 0;
+
+  /**
+   * Only offered when you are the one paying: a deep link can pre-fill their
+   * app, but it cannot make someone else send you money. `buildUpiLink`
+   * returns null unless there is a valid handle, a positive amount and
+   * rupees, so this single check covers all of it.
+   */
+  const upiLink =
+    direction === 'pay'
+      ? buildUpiLink({
+          upiId: other?.upiId,
+          payeeName: other?.name,
+          amount: total,
+          currency,
+          note: note.trim() || `Splitta settle up`,
+        })
+      : null;
 
   async function onSubmit(e) {
     e?.preventDefault();
@@ -185,7 +213,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
         onClose={onClose}
         footer={
           <Button size="lg" block onClick={onSubmit} loading={busy} icon={Wallet}>
-            Record payment
+            {handedOff ? 'I have paid — record it' : 'Record payment'}
           </Button>
         }
       >
@@ -197,6 +225,39 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
               subtitle="Log cash or a transfer that already happened"
             />
           </Section>
+
+          {/* ------------------------------------------------ UPI hand-off */}
+          {upiLink && (
+            <Section i={0.5}>
+              <GroupLabel>Pay now</GroupLabel>
+              {/* A plain anchor, not a router push: the href is a upi: scheme
+                  the OS hands to a payment app, and Next's Link would try to
+                  route it. */}
+              <a
+                href={upiLink}
+                onClick={() => setHandedOff(true)}
+                className="flex w-full items-center gap-3 rounded-[18px] bg-panel px-4 py-3.5
+                  text-left tap active:scale-[0.99]"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-on-brand">
+                  <ExternalLink size={18} strokeWidth={2.4} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="newq block text-[15px] text-white">
+                    Pay {money(total, currency)} by UPI
+                  </span>
+                  <span className="newq block truncate text-[12px] text-on-panel-2">
+                    Opens your UPI app · {other?.upiId}
+                  </span>
+                </span>
+              </a>
+              <p className="newq mt-2 px-1.5 text-[12px]">
+                {handedOff
+                  ? 'Once it goes through, record it below so your balance updates.'
+                  : 'Splitta cannot see whether a UPI transfer succeeded, so recording it stays a separate step.'}
+              </p>
+            </Section>
+          )}
 
           {/* ------------------------------------------------ person */}
           <Section i={1}>

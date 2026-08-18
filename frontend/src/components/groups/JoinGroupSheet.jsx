@@ -19,7 +19,7 @@ const CODE_LENGTH = 6;
  * step is what stops a mistyped code from silently dropping someone into a
  * stranger's group.
  */
-export default function JoinGroupSheet({ open, onClose, onJoined }) {
+export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = '' }) {
   const { previewGroup, joinGroup } = useApp();
   const { toast } = useToast();
   const router = useRouter();
@@ -39,10 +39,19 @@ export default function JoinGroupSheet({ open, onClose, onJoined }) {
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setCode('');
+      const seed = String(initialCode || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, CODE_LENGTH);
+      setCode(seed);
       setBusy(false);
       setFailed('');
       setLookup({ code: '', group: null, error: '', looking: false });
+      // A scanned code arrives complete, so look it up straight away instead
+      // of waiting for a keystroke that will never come. Deferred by a
+      // microtask because lookUp both sets state and fires a request, and
+      // neither belongs in the render phase.
+      if (seed.length === CODE_LENGTH) Promise.resolve().then(() => lookUp(seed));
     }
   }
 

@@ -89,6 +89,9 @@ export const normUser = (u) =>
     avatarBg: u.avatarBg || '',
     /** Shareable handle — only ever sent for your own account. */
     code: u.code || '',
+    /** UPI address. Present for yourself and for confirmed friends; the
+        server blanks it for people you only share a group with. */
+    upiId: u.upiId || '',
     /**
      * Confirmed friend, versus someone visible only because you share a
      * group. Non-friends stay out of every picker. `/auth/me` does not send

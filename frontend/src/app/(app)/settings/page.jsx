@@ -13,6 +13,7 @@ import {
   Coins,
   Bell,
   RefreshCw,
+  IndianRupee,
   LogOut,
   RotateCcw,
   Info,
@@ -33,6 +34,7 @@ import { ActionTiles, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Bl
 import { Badge, Switch } from '@/components/ui/Bits';
 import { useApp } from '@/store/AppContext';
 import { pushReason } from '@/lib/push';
+import { isValidUpiId } from '@/lib/upi';
 import { useToast } from '@/components/ui/Toast';
 import { CURRENCIES } from '@/lib/format';
 
@@ -97,6 +99,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(me.name);
   const [email, setEmail] = useState(me.email || '');
   const [phone, setPhone] = useState(me.phone || '');
+  const [upiId, setUpiId] = useState(me.upiId || '');
   const [avatarSeed, setAvatarSeed] = useState(me.avatarSeed || me.name || me.id);
   const [avatarStyle, setAvatarStyle] = useState(me.avatarStyle || 'adventurer');
   const [avatarBg, setAvatarBg] = useState(me.avatarBg || '');
@@ -179,6 +182,7 @@ export default function SettingsPage() {
         name: name.trim() || me.name,
         email: email.trim(),
         phone: phone.trim(),
+        upiId: upiId.trim(),
         avatarSeed: avatarSeed.trim() || name.trim() || me.name,
         avatarStyle,
         avatarBg,
@@ -203,6 +207,7 @@ export default function SettingsPage() {
     setName(me.name);
     setEmail(me.email || '');
     setPhone(me.phone || '');
+    setUpiId(me.upiId || '');
     if (currentIndex >= 0) {
       setAvatarIndex(currentIndex);
       setAvatarSeed(AVATAR_OPTIONS[currentIndex].seed);
@@ -543,6 +548,33 @@ export default function SettingsPage() {
               setDirty(true);
             }}
           />
+
+          <div>
+            <Input
+              label="UPI ID"
+              hint="optional"
+              icon={IndianRupee}
+              placeholder="you@okhdfcbank"
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
+              value={upiId}
+              onChange={(e) => {
+                setUpiId(e.target.value);
+                setDirty(true);
+              }}
+              error={
+                upiId.trim() && !isValidUpiId(upiId)
+                  ? 'That does not look like a UPI ID — try name@bank'
+                  : ''
+              }
+            />
+            <GroupNote icon={IndianRupee}>
+              Lets friends settle up by opening their own UPI app with the amount
+              already filled in. Only your friends can see it, and Splitta never
+              touches the money.
+            </GroupNote>
+          </div>
         </div>
       </Sheet>
 

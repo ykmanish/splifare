@@ -8,6 +8,14 @@ const router = express.Router();
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
+/**
+ * A UPI virtual payment address: a handle, then `@`, then a provider tag.
+ * NPCI allows letters, digits, dot, hyphen and underscore in the handle.
+ * Kept deliberately strict — this string is interpolated into a `upi://`
+ * link, so anything odd in it ends up in a URL the phone will act on.
+ */
+const UPI_RE = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z]{2,32}$/;
+
 router.post(
   '/register',
   asyncHandler(async (req, res) => {
@@ -61,6 +69,15 @@ router.patch(
     const allowed = ['name', 'phone', 'currency', 'theme', 'avatarSeed', 'avatarStyle', 'avatarBg'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) req.user[key] = req.body[key];
+    }
+
+    if (req.body.upiId !== undefined) {
+      const upi = String(req.body.upiId).trim();
+      // Empty clears it; anything else has to be a real-looking VPA.
+      if (upi && !UPI_RE.test(upi)) {
+        throw new HttpError(400, 'That does not look like a UPI ID — try name@bank');
+      }
+      req.user.upiId = upi;
     }
     if (req.body.email) {
       const email = String(req.body.email).trim().toLowerCase();

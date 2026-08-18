@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { motion } from 'framer-motion';
-import { Check, Copy, RefreshCw, Share2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Copy, QrCode as QrIcon, RefreshCw, Share2 } from 'lucide-react';
+import QrCode from './QrCode';
 
 const SPRING = { type: 'spring', damping: 26, stiffness: 320 };
 
@@ -58,11 +59,17 @@ export default function CodeBox({
   tone = 'panel',
   shareTitle,
   shareText,
+  /** What the QR should encode — usually a join link, not the bare code, so
+      scanning lands the person on the right screen instead of showing them
+      six characters to retype. Omit it and no QR button appears. */
+  qrValue,
+  qrLabel,
   onRotate,
   rotating = false,
   className = '',
 }) {
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   // Absent on desktop and on insecure origins, so the button only appears
   // once the client has confirmed it exists.
@@ -131,6 +138,19 @@ export default function CodeBox({
         </p>
 
         <span className="flex shrink-0 items-center gap-1.5">
+          {qrValue && (
+            <button
+              type="button"
+              onClick={() => setShowQr((v) => !v)}
+              aria-expanded={showQr}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5
+                newq text-[12px] tap active:scale-95 ${chip}`}
+            >
+              <QrIcon size={13} strokeWidth={2.3} />
+              {showQr ? 'Hide' : 'QR'}
+            </button>
+          )}
+
           {canShare && (
             <button
               type="button"
@@ -161,6 +181,25 @@ export default function CodeBox({
           )}
         </span>
       </div>
+
+      <AnimatePresence initial={false}>
+        {showQr && qrValue && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col items-center pt-4">
+              <QrCode value={qrValue} size={172} label={qrLabel || `QR code for ${label}`} />
+              <p className={`newq mt-2.5 text-center text-[11.5px] ${capText}`}>
+                Point a camera at this to join
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

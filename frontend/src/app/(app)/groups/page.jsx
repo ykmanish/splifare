@@ -19,6 +19,7 @@ import {
   PersonRow,
 } from '@/components/ui/Blocks';
 import CodeBox, { spaceCode } from '@/components/ui/CodeBox';
+import { groupInviteLink } from '@/lib/invite';
 import FxNote from '@/components/ui/FxNote';
 import CreateGroupSheet from '@/components/groups/CreateGroupSheet';
 import JoinGroupSheet from '@/components/groups/JoinGroupSheet';
@@ -206,6 +207,8 @@ function EditGroupSheet({ group, onClose }) {
             hint="Rotate it if it ends up somewhere it should not be"
             shareTitle={`Join ${group?.name || 'my group'} on Splitta`}
             shareText={`Join ${group?.name || 'my group'} on Splitta — the room code is ${group?.code || ''}`}
+            qrValue={groupInviteLink(group?.code)}
+            qrLabel={`QR code to join ${group?.name || 'this group'}`}
             onRotate={onRotate}
             rotating={rotating}
           />
@@ -384,8 +387,11 @@ function GroupsInner() {
   const { toast } = useToast();
   const params = useSearchParams();
 
+  /* `?join=1` opens an empty join sheet; `?join=<code>` is what a scanned QR
+     hits, and opens it with the code already in. */
+  const joinParam = params.get('join') || '';
   const [creating, setCreating] = useState(params.get('new') === '1');
-  const [joining, setJoining] = useState(params.get('join') === '1');
+  const [joining, setJoining] = useState(!!joinParam);
   const [choosing, setChoosing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -555,7 +561,11 @@ function GroupsInner() {
 
       <CreateGroupSheet open={creating} onClose={() => setCreating(false)} />
 
-      <JoinGroupSheet open={joining} onClose={() => setJoining(false)} />
+      <JoinGroupSheet
+        open={joining}
+        onClose={() => setJoining(false)}
+        initialCode={joinParam === '1' ? '' : joinParam}
+      />
 
       <EditGroupSheet group={editing} onClose={() => setEditing(null)} />
 

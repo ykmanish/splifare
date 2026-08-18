@@ -4,8 +4,10 @@ const { uniqueCode } = require('./codes');
 
 /**
  * What a stranger is allowed to learn about you. Sharing a group is enough
- * to see a name and a face — it is not enough to see an email or a phone
- * number, so those stay out of this shape.
+ * to see a name and a face — it is not enough to see an email, a phone
+ * number or a UPI ID, so none of those appear in this shape. Built by
+ * naming what goes in rather than deleting from the full record, so a field
+ * added to the schema later cannot leak here by default.
  */
 function publicUser(user) {
   const u = typeof user.toJSON === 'function' ? user.toJSON() : user;
