@@ -3,21 +3,29 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { KeyRound, Plus, Sparkles, UsersRound, UserPlus } from 'lucide-react';
+import { ChevronRight, KeyRound, Plus, Sparkles, UsersRound, UserPlus } from 'lucide-react';
 import Page from '@/components/layout/Page';
 import Button from '@/components/ui/Button';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import { Input, Label, SearchInput } from '@/components/ui/Field';
-import { PersonToggle } from '@/components/ui/Avatar';
+
 import { Badge, Card, EmptyState, RowMenu, cycleTone } from '@/components/ui/Bits';
-import { AvatarCluster, CoralFab, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
+import {
+  AvatarCluster,
+  CoralFab,
+  FieldRow,
+  GroupLabel,
+  ListGroup,
+  PersonRow,
+} from '@/components/ui/Blocks';
 import CodeBox, { spaceCode } from '@/components/ui/CodeBox';
 import CreateGroupSheet from '@/components/groups/CreateGroupSheet';
 import JoinGroupSheet from '@/components/groups/JoinGroupSheet';
+import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor } from '@/lib/balances';
-import { money } from '@/lib/format';
+import { money, firstName } from '@/lib/format';
 import { GROUP_EMOJIS } from '@/lib/categories';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -31,22 +39,25 @@ function EditGroupSheet({ group, onClose }) {
   const [gid, setGid] = useState(null);
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('🏠');
-  const [memberIds, setMemberIds] = useState([]);
   const [busy, setBusy] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [viewingMember, setViewingMember] = useState(null);
 
-  /* Friends you could add, plus whoever is already here — someone who joined
-     by code is a member without being a friend, and must still be listed. */
-  const roster = useMemo(() => {
-    const seen = new Set([me?.id]);
-    const out = [];
-    for (const p of [...friends, ...(group?.memberIds || []).map((id) => people.find((x) => x.id === id))]) {
-      if (!p || seen.has(p.id)) continue;
-      seen.add(p.id);
-      out.push(p);
-    }
-    return out;
-  }, [friends, people, group, me]);
+  /* Members and addable friends are two different lists with two different
+     actions — tap a member to open their card, tap a friend to add them.
+     A single toggle list is what let a stray tap remove somebody. */
+  const otherMembers = useMemo(() => {
+    const ids = group?.memberIds || [];
+    return ids
+      .filter((id) => id !== me?.id)
+      .map((id) => people.find((x) => x.id === id))
+      .filter(Boolean);
+  }, [group, people, me]);
+
+  const addableFriends = useMemo(() => {
+    const ids = new Set(group?.memberIds || []);
+    return friends.filter((p) => p && !ids.has(p.id));
+  }, [friends, group]);
 
   /* Seed the form the moment a group is handed in. Keeping this in render
      (rather than an effect) means the sheet never flashes stale values. */
@@ -54,7 +65,6 @@ function EditGroupSheet({ group, onClose }) {
     setGid(group.id);
     setName(group.name);
     setEmoji(group.emoji);
-    setMemberIds(group.memberIds);
     setBusy(false);
   }
 
@@ -63,12 +73,32 @@ function EditGroupSheet({ group, onClose }) {
     onClose();
   }
 
-  function toggle(pid) {
-    if (pid === me?.id) return;
-    setMemberIds((m) => {
-      const next = m.includes(pid) ? m.filter((x) => x !== pid) : [...m, pid];
-      return next.length ? next : m;
-    });
+  async function addMember(person) {
+    if (!group || group.memberIds.includes(person.id)) return;
+    try {
+      await updateGroup(group.id, { memberIds: [...group.memberIds, person.id] });
+      toast({ title: `${firstName(person.name)} added`, description: `They are now in ${group.name}.` });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not add them', description: err.message });
+    }
+  }
+
+  /* Throws on failure so MemberSheet keeps itself open on error. */
+  async function removeMember(person) {
+    if (!group) return;
+    const next = group.memberIds.filter((x) => x !== person.id);
+    if (!next.length) return;
+    try {
+      await updateGroup(group.id, { memberIds: next });
+      toast({
+        tone: 'info',
+        title: `${firstName(person.name)} removed`,
+        description: `They are no longer in ${group.name}.`,
+      });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not remove them', description: err.message });
+      throw err;
+    }
   }
 
   async function onRotate() {
@@ -93,7 +123,8 @@ function EditGroupSheet({ group, onClose }) {
     if (clean.length < 2) return;
     setBusy(true);
     try {
-      await updateGroup(group.id, { name: clean, emoji, memberIds });
+      // Members are applied as they change, so this only carries the drafts.
+      await updateGroup(group.id, { name: clean, emoji });
       toast({ title: 'Group updated', description: clean });
       close();
     } catch (err) {
@@ -180,25 +211,69 @@ function EditGroupSheet({ group, onClose }) {
         </div>
 
         <div>
-          <Label hint={`${memberIds.length} in this group`}>Members</Label>
-          <div className="space-y-1.5">
-            <PersonToggle person={me} subtitle="You — always a member" selected disabled />
-            {roster.map((p) => (
-              <PersonToggle
+          <Label hint={`${group?.memberIds.length || 0} in this group`}>Members</Label>
+          <ListGroup>
+            <PersonRow person={me} name="You" sublabel="Always a member" />
+
+            {otherMembers.map((p) => (
+              <PersonRow
                 key={p.id}
                 person={p}
-                subtitle={p.isFriend ? p.email : 'joined with the code'}
-                selected={memberIds.includes(p.id)}
-                onToggle={toggle}
+                sublabel={p.isFriend ? p.email : 'joined with the code'}
+                onClick={() => setViewingMember(p)}
+                trailing={
+                  <ChevronRight size={18} strokeWidth={2.2} className="shrink-0 text-ink-3" />
+                }
               />
             ))}
-          </div>
-          <p className="newq mt-2.5 flex items-start gap-1.5 px-1.5 text-[12px]">
-            <UserPlus size={13} className="mt-0.5 shrink-0" />
-            Only your friends can be added from here. Everyone else joins with the room code.
+          </ListGroup>
+          <p className="newq mt-2.5 px-1.5 text-[12px]">
+            Tap a member to open their card, or to remove them.
           </p>
         </div>
+
+        <div>
+          <Label hint={addableFriends.length ? `${addableFriends.length} available` : undefined}>
+            Add from your friends
+          </Label>
+          {addableFriends.length ? (
+            <ListGroup>
+              {addableFriends.map((p) => (
+                <PersonRow
+                  key={p.id}
+                  person={p}
+                  sublabel={p.email}
+                  onClick={() => addMember(p)}
+                  trailing={
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+                      <UserPlus size={15} strokeWidth={2.4} />
+                    </span>
+                  }
+                />
+              ))}
+            </ListGroup>
+          ) : (
+            <Card tone="skySoft" pad={false}>
+              <FieldRow
+                icon={UserPlus}
+                iconTint="var(--brand)"
+                iconBg="var(--sky)"
+                label="Everyone you know is already here"
+                sublabel="Anyone else joins with the room code"
+              />
+            </Card>
+          )}
+        </div>
       </div>
+
+      <MemberSheet
+        open={!!viewingMember}
+        onClose={() => setViewingMember(null)}
+        person={viewingMember}
+        groupName={group?.name || 'this group'}
+        isMember={!!viewingMember && !!group?.memberIds.includes(viewingMember.id)}
+        onRemove={removeMember}
+      />
     </Sheet>
   );
 }

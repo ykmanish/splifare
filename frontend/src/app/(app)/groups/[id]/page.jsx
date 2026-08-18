@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   ChevronLeft,
+  ChevronRight,
   DoorOpen,
   Plus,
   Receipt,
@@ -20,7 +21,7 @@ import { useUI } from '@/components/layout/AppShell';
 import Button from '@/components/ui/Button';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import { Input, Label } from '@/components/ui/Field';
-import Avatar, { PersonToggle } from '@/components/ui/Avatar';
+import Avatar from '@/components/ui/Avatar';
 import {
   Segmented,
   EmptyState,
@@ -37,10 +38,12 @@ import {
   GroupLabel,
   IconCircle,
   ListGroup,
+  PersonRow,
   SheetHeader,
   StatusPill,
 } from '@/components/ui/Blocks';
 import CodeBox from '@/components/ui/CodeBox';
+import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor, netByMember, simplify, shareOf } from '@/lib/balances';
@@ -158,6 +161,7 @@ export default function GroupDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [viewingMember, setViewingMember] = useState(null);
   const [deletingExpense, setDeletingExpense] = useState(null);
   const [deletingList, setDeletingList] = useState(null);
 
@@ -203,15 +207,13 @@ export default function GroupDetailPage() {
 
   const members = group.memberIds.map((m) => personById(m));
 
-  /* Friends you could still add, plus everyone already here — someone who
-     joined with the code is a member without being a friend. */
-  const roster = [];
-  const seenIds = new Set([me.id]);
-  for (const p of [...friends, ...members]) {
-    if (!p || seenIds.has(p.id)) continue;
-    seenIds.add(p.id);
-    roster.push(p);
-  }
+  /* Two separate lists, because the two actions are not alike: tapping a
+     member opens their card, tapping a friend adds them. Showing both in one
+     toggle list is what made a stray tap remove somebody. */
+  const otherMembers = members.filter((p) => p && p.id !== me.id);
+
+  const memberIdSet = new Set(group.memberIds);
+  const addableFriends = friends.filter((p) => p && !memberIdSet.has(p.id));
 
   const groupLists = lists.filter((l) => l.groupId === group.id);
   const { mine, nets, transfers, groupExpenses, total } = data;
@@ -252,16 +254,30 @@ export default function GroupDetailPage() {
     }
   }
 
-  async function toggleMember(pid) {
-    if (pid === me.id) return;
-    const next = group.memberIds.includes(pid)
-      ? group.memberIds.filter((x) => x !== pid)
-      : [...group.memberIds, pid];
+  async function addMember(person) {
+    if (group.memberIds.includes(person.id)) return;
+    try {
+      await updateGroup(group.id, { memberIds: [...group.memberIds, person.id] });
+      toast({ title: `${firstName(person.name)} added`, description: `They can add expenses in ${group.name}.` });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not add them', description: err.message });
+    }
+  }
+
+  /* Throws on failure so MemberSheet keeps its own sheet open on error. */
+  async function removeMember(person) {
+    const next = group.memberIds.filter((x) => x !== person.id);
     if (!next.length) return;
     try {
       await updateGroup(group.id, { memberIds: next });
+      toast({
+        tone: 'info',
+        title: `${firstName(person.name)} removed`,
+        description: `They are no longer in ${group.name}.`,
+      });
     } catch (err) {
-      toast({ tone: 'error', title: 'Could not update members', description: err.message });
+      toast({ tone: 'error', title: 'Could not remove them', description: err.message });
+      throw err;
     }
   }
 
@@ -681,22 +697,70 @@ export default function GroupDetailPage() {
 
           <div>
             <Label hint={`${group.memberIds.length} in this group`}>Members</Label>
-            <div className="space-y-1.5">
-              <PersonToggle person={me} subtitle="You — always a member" selected disabled />
-              {roster.map((p) => (
-                <PersonToggle
-                  key={p.id}
-                  person={p}
-                  subtitle={p.isFriend ? p.email : 'joined with the code'}
-                  selected={group.memberIds.includes(p.id)}
-                  onToggle={toggleMember}
-                />
-              ))}
-            </div>
-            <p className="newq mt-2.5 flex items-start gap-1.5 px-1.5 text-[12px]">
-              <UserPlus size={13} className="mt-0.5 shrink-0" />
-              Only your friends can be added from here. Everyone else joins with the room code.
+            <ListGroup>
+              <PersonRow
+                person={me}
+                name="You"
+                sublabel="Tap for your balance here"
+                onClick={() => setViewingMember(me)}
+                trailing={<ChevronRight size={18} strokeWidth={2.2} className="shrink-0 text-ink-3" />}
+              />
+
+              {otherMembers.map((p) => {
+                const n = nets[p.id] || 0;
+                return (
+                  <PersonRow
+                    key={p.id}
+                    person={p}
+                    sublabel={
+                      Math.abs(n) < 0.005
+                        ? 'settled up'
+                        : `${n > 0 ? 'is owed' : 'owes'} ${money(Math.abs(n), currency)}`
+                    }
+                    onClick={() => setViewingMember(p)}
+                    trailing={
+                      <ChevronRight size={18} strokeWidth={2.2} className="shrink-0 text-ink-3" />
+                    }
+                  />
+                );
+              })}
+            </ListGroup>
+            <p className="newq mt-2.5 px-1.5 text-[12px]">
+              Tap anyone to see their balance, or to remove them.
             </p>
+          </div>
+
+          <div>
+            <Label hint={addableFriends.length ? `${addableFriends.length} available` : undefined}>
+              Add from your friends
+            </Label>
+            {addableFriends.length ? (
+              <ListGroup>
+                {addableFriends.map((p) => (
+                  <PersonRow
+                    key={p.id}
+                    person={p}
+                    sublabel={p.email}
+                    onClick={() => addMember(p)}
+                    trailing={
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+                        <UserPlus size={15} strokeWidth={2.4} />
+                      </span>
+                    }
+                  />
+                ))}
+              </ListGroup>
+            ) : (
+              <Card tone="skySoft" pad={false}>
+                <FieldRow
+                  icon={UserPlus}
+                  iconTint="var(--brand)"
+                  iconBg="var(--sky)"
+                  label="Everyone you know is already here"
+                  sublabel="Anyone else joins with the room code"
+                />
+              </Card>
+            )}
           </div>
 
           <div>
@@ -734,6 +798,19 @@ export default function GroupDetailPage() {
           </div>
         </div>
       </Sheet>
+
+      <MemberSheet
+        open={!!viewingMember}
+        onClose={() => setViewingMember(null)}
+        person={viewingMember}
+        groupName={group.name}
+        balance={viewingMember ? (viewingMember.id === me.id ? mine.net : nets[viewingMember.id] || 0) : null}
+        currency={currency}
+        isYou={viewingMember?.id === me.id}
+        isMember={!!viewingMember && group.memberIds.includes(viewingMember.id)}
+        onRemove={removeMember}
+        onLeave={() => setConfirmLeave(true)}
+      />
 
       <ConfirmSheet
         open={confirmLeave}
