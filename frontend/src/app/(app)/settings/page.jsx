@@ -34,6 +34,7 @@ import { ActionTiles, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Bl
 import { Badge, Switch } from '@/components/ui/Bits';
 import { useApp } from '@/store/AppContext';
 import { pushReason } from '@/lib/push';
+import { haptics, hapticsEnabled, hapticsSupported, setHapticsEnabled } from '@/lib/haptics';
 import { isValidUpiId } from '@/lib/upi';
 import { useToast } from '@/components/ui/Toast';
 import { CURRENCIES } from '@/lib/format';
@@ -115,6 +116,9 @@ export default function SettingsPage() {
   const [confirmWipe, setConfirmWipe] = useState(false);
 
   const [pushBusy, setPushBusy] = useState(false);
+  /* Read once on mount rather than every render: localStorage is synchronous
+     and this sits in a screen that re-renders on every keystroke. */
+  const [buzz, setBuzz] = useState(() => hapticsEnabled());
   const [ratesBusy, setRatesBusy] = useState(false);
 
   const activeTheme = THEMES.find((t) => t.id === prefs.theme) || THEMES[2];
@@ -624,6 +628,30 @@ export default function SettingsPage() {
             />
           </div>
         </ListGroup>
+
+        <div className="mt-3">
+          <ListGroup tone="fill">
+            <div className="px-4 py-3">
+              <Switch
+                id="haptics-on"
+                label="Vibrate on expenses and payments"
+                description={
+                  hapticsSupported()
+                    ? 'A short buzz when a bill is added, a longer one when a balance clears.'
+                    : 'This device does not support vibration — iPhones never do.'
+                }
+                checked={buzz && hapticsSupported()}
+                disabled={!hapticsSupported()}
+                onChange={(next) => {
+                  setHapticsEnabled(next);
+                  setBuzz(next);
+                  // Fire one so the choice is felt, not just read.
+                  if (next) haptics.success();
+                }}
+              />
+            </div>
+          </ListGroup>
+        </div>
 
         {pushOn && (
           <div className="mt-3">

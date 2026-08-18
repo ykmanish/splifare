@@ -21,6 +21,7 @@ import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balanceBetween } from '@/lib/balances';
 import { buildUpiLink } from '@/lib/upi';
+import { haptics } from '@/lib/haptics';
 import { money, firstName } from '@/lib/format';
 
 /** Section entrance — restrained, staggered by index. */
@@ -177,8 +178,11 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
             ? `You paid ${firstName(other.name)} ${money(total, currency)}.`
             : `${firstName(other.name)} paid you ${money(total, currency)}.`,
       });
+      // The bigger pattern of the two: a balance coming off is the good news.
+      haptics.settled();
       setStatus('success');
     } catch (err) {
+      haptics.error();
       setStatus(null);
       toast({ tone: 'error', title: 'Could not record it', description: err.message });
     } finally {

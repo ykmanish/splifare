@@ -15,6 +15,7 @@ import CategoryPicker from './CategoryPicker';
 import SplitEditor from './SplitEditor';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
+import { haptics } from '@/lib/haptics';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
 import { firstName, CURRENCIES } from '@/lib/format';
 import { rateLabel } from '@/lib/fx';
@@ -291,9 +292,12 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
     try {
       if (editing) {
         await updateExpense(editing.id, payload);
+        // A lighter tick for an edit: nothing new joined the ledger.
+        haptics.tap();
         setSaved({ title: 'Changes saved', body: payload.description });
       } else {
         await addExpense(payload);
+        haptics.success();
         const others = split.splits.length - 1;
         setSaved({
           title: 'Expense added',
@@ -306,6 +310,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
       setStatus('success');
       onClose();
     } catch (err) {
+      haptics.error();
       toast({ tone: 'error', title: 'Could not save', description: err.message });
     } finally {
       setBusy(false);

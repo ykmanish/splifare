@@ -25,6 +25,7 @@ import AssignSheet from '@/components/lists/AssignSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { GROCERY_AISLES, UNITS } from '@/lib/categories';
+import { haptics } from '@/lib/haptics';
 import { allocate, splitsFromItems } from '@/lib/split';
 import { money, symbolOf, firstName } from '@/lib/format';
 
@@ -126,9 +127,12 @@ export default function ShopModePage() {
     setStatus('processing');
     try {
       const expense = await checkoutList(list.id, opts);
+      // Checkout is an expense being recorded, so it gets the same beat.
+      haptics.success();
       setResult({ amount: expense.amount, people: expense.splits.length });
       setStatus('success');
     } catch (err) {
+      haptics.error();
       setFailure(err.message);
       setStatus('error');
       toast({ tone: 'error', title: 'Could not check out', description: err.message });
