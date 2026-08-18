@@ -244,9 +244,14 @@ export function Stepper({ value, onChange, min = 0, max = 999, label, className 
    TOGGLE
    ================================================================ */
 
-export function Toggle({ checked, onChange, label, description, id }) {
+export function Toggle({ checked, onChange, label, description, id, disabled = false }) {
   return (
-    <label htmlFor={id} className="flex cursor-pointer items-center justify-between gap-4 py-1">
+    <label
+      htmlFor={id}
+      className={`flex items-center justify-between gap-4 py-1 ${
+        disabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer'
+      }`}
+    >
       <span className="min-w-0">
         {label && <span className="newq  text-ink block text-[15px]">{label}</span>}
         {description && <span className="newq mt-0.5 block text-[12.5px]">{description}</span>}
@@ -256,8 +261,10 @@ export function Toggle({ checked, onChange, label, description, id }) {
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 shrink-0 rounded-full tap ${checked ? 'bg-brand' : 'bg-surface-3'}`}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`relative h-7 w-12 shrink-0 rounded-full tap disabled:pointer-events-none
+          ${checked ? 'bg-brand' : 'bg-surface-3'}`}
       >
         <motion.span
           layout

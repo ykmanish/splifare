@@ -30,7 +30,8 @@ function Section({ i = 0, className = '', children }) {
 }
 
 export default function SettleUpSheet({ open, onClose, prefill = {} }) {
-  const { me, people, friends, groups, expenses, settlements, currency, settleUp } = useApp();
+  const { me, people, friends, groups, expenses, settlements, currency, convert, settleUp } =
+    useApp();
   const { toast } = useToast();
 
   const [withId, setWithId] = useState('');
@@ -68,8 +69,8 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
 
   /* Balance for the chosen scope, so we can suggest the right amount. */
   const scopedLedger = useMemo(
-    () => buildLedger(expenses, settlements, groupId || undefined),
-    [expenses, settlements, groupId],
+    () => buildLedger(expenses, settlements, groupId || undefined, convert),
+    [expenses, settlements, groupId, convert],
   );
   const balance = withId && me ? balanceBetween(scopedLedger, me.id, withId) : 0;
 
@@ -93,7 +94,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
       setNote('');
 
       if (target && me) {
-        const led = buildLedger(expenses, settlements, g || undefined);
+        const led = buildLedger(expenses, settlements, g || undefined, convert);
         const bal = balanceBetween(led, me.id, target);
         setDirection(bal < 0 ? 'pay' : 'receive');
         setAmount(Math.abs(bal) > 0.005 ? String(Math.abs(bal)) : '');
@@ -116,7 +117,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const onScope = (g) => {
     setGroupId(g);
     if (!withId || !me) return;
-    const led = buildLedger(expenses, settlements, g || undefined);
+    const led = buildLedger(expenses, settlements, g || undefined, convert);
     const bal = balanceBetween(led, me.id, withId);
     setDirection(bal < 0 ? 'pay' : 'receive');
     setAmount(Math.abs(bal) > 0.005 ? String(Math.abs(bal)) : '');
@@ -138,6 +139,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
         fromUserId: direction === 'pay' ? me.id : withId,
         toUserId: direction === 'pay' ? withId : me.id,
         amount: total,
+        currency,
         groupId: groupId || null,
         note: note.trim(),
       });

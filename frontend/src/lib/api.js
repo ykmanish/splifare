@@ -141,6 +141,7 @@ export const normSettlement = (s) =>
     fromUserId: id(s.from),
     toUserId: id(s.to),
     amount: Number(s.amount) || 0,
+    currency: s.currency || 'INR',
     groupId: id(s.group),
     note: s.note || '',
     date: s.date,
@@ -271,6 +272,15 @@ export const api = {
   readAllNotifications: () => post('/notifications/read-all'),
   clearNotifications: () => del('/notifications'),
   activity: () => get('/activity'),
+
+  /* exchange rates */
+  rates: (base) => get(`/rates${base ? `?base=${encodeURIComponent(base)}` : ''}`),
+
+  /* web push */
+  pushKey: () => get('/push/key'),
+  pushSubscribe: (subscription) => post('/push/subscribe', subscription),
+  pushUnsubscribe: (endpoint) => post('/push/unsubscribe', { endpoint }),
+  pushTest: () => post('/push/test'),
 
   health: () => request('/health', { auth: false }),
 };

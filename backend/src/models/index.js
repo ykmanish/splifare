@@ -150,6 +150,9 @@ const settlementSchema = new Schema(
     from: { ...ref('User'), required: true },
     to: { ...ref('User'), required: true },
     amount: { type: Number, required: true, min: 0 },
+    /** Without this a payment is a bare number, so it could not be netted
+        against expenses recorded in another currency. */
+    currency: { type: String, default: 'INR' },
     group: { ...ref('Group'), default: null },
     note: { type: String, default: '', maxlength: 200 },
     date: { type: Date, default: Date.now },
@@ -245,6 +248,48 @@ const notificationSchema = new Schema(
 );
 notificationSchema.index({ user: 1, createdAt: -1 });
 
+/* --------------------------------------------------- ExchangeRate */
+
+/**
+ * One cached rate table per base currency. `date` is an ISO day for a
+ * historical snapshot or the literal 'latest' for the live table, which is
+ * what makes the pair uniquely indexable.
+ */
+const exchangeRateSchema = new Schema(
+  {
+    base: { type: String, required: true, uppercase: true },
+    date: { type: String, required: true },
+    /** What the source called the day these rates are for. */
+    rateDate: { type: String, default: null },
+    rates: { type: Map, of: Number, default: {} },
+    source: { type: String, default: '' },
+    fetchedAt: { type: Date, default: Date.now },
+  },
+  baseOptions,
+);
+exchangeRateSchema.index({ base: 1, date: 1 }, { unique: true });
+
+/* ----------------------------------------------- PushSubscription */
+
+/**
+ * One row per browser that opted in. `endpoint` is unique because that is
+ * what the push service hands back, and re-subscribing the same browser
+ * must update rather than duplicate.
+ */
+const pushSubscriptionSchema = new Schema(
+  {
+    user: { ...ref('User'), required: true, index: true },
+    endpoint: { type: String, required: true, unique: true },
+    keys: {
+      p256dh: { type: String, required: true },
+      auth: { type: String, required: true },
+    },
+    userAgent: { type: String, default: '' },
+    lastSeenAt: { type: Date, default: Date.now },
+  },
+  baseOptions,
+);
+
 /* -------------------------------------------------- FriendRequest */
 
 /**
@@ -291,6 +336,8 @@ module.exports = {
   User: model('User', userSchema),
   Group: model('Group', groupSchema),
   FriendRequest: model('FriendRequest', friendRequestSchema),
+  ExchangeRate: model('ExchangeRate', exchangeRateSchema),
+  PushSubscription: model('PushSubscription', pushSubscriptionSchema),
   Expense: model('Expense', expenseSchema),
   Settlement: model('Settlement', settlementSchema),
   ShoppingList: model('ShoppingList', listSchema),

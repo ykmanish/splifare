@@ -13,6 +13,8 @@ const expenseRoutes = require('./src/routes/expenses');
 const settlementRoutes = require('./src/routes/settlements');
 const listRoutes = require('./src/routes/lists');
 const feedRoutes = require('./src/routes/feed');
+const rateRoutes = require('./src/routes/rates');
+const pushRoutes = require('./src/routes/push');
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
@@ -54,6 +56,8 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/settlements', settlementRoutes);
 app.use('/api/lists', listRoutes);
+app.use('/api/rates', rateRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api', feedRoutes);
 
 app.use(notFound);

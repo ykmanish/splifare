@@ -22,6 +22,7 @@ import { Input, SearchInput } from '@/components/ui/Field';
 import { Badge, Card, EmptyState, RowMenu, cycleTone } from '@/components/ui/Bits';
 import { BubbleTile, CoralFab, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import CodeBox from '@/components/ui/CodeBox';
+import FxNote from '@/components/ui/FxNote';
 import { Pills } from '@/components/ui/Controls';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
@@ -363,6 +364,8 @@ export default function FriendsPage() {
             value={money(overview.owe, currency)}
           />
         </motion.div>
+
+        <FxNote className="-mt-4" />
 
         {/* ------------------------------------------------ incoming */}
         {incoming.length > 0 && (

@@ -16,7 +16,8 @@ import SplitEditor from './SplitEditor';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
-import { firstName } from '@/lib/format';
+import { firstName, CURRENCIES } from '@/lib/format';
+import { rateLabel } from '@/lib/fx';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -52,6 +53,7 @@ function initialForm({ editing, prefill, groups, me }) {
 
     return {
       amount: String(editing.amount),
+      currency: editing.currency || me?.currency || 'INR',
       description: editing.description,
       category: editing.category,
       groupId: editing.groupId || '',
@@ -85,6 +87,7 @@ function initialForm({ editing, prefill, groups, me }) {
 
   return {
     amount: prefill.amount ? String(prefill.amount) : '',
+    currency: prefill.currency || me?.currency || 'INR',
     description: prefill.description || '',
     category: prefill.category || 'other',
     groupId,
@@ -100,11 +103,14 @@ function initialForm({ editing, prefill, groups, me }) {
 }
 
 export default function AddExpenseSheet({ open, onClose, prefill = {}, editing = null }) {
-  const { me, people, splitPool, groups, currency, addExpense, updateExpense, deleteExpense } =
+  const { me, people, splitPool, groups, currency, convert, addExpense, updateExpense, deleteExpense } =
     useApp();
   const { toast } = useToast();
 
   const [amount, setAmount] = useState('');
+  /** The currency this expense is recorded in — not necessarily the one the
+      viewer reads totals in. */
+  const [cur, setCur] = useState(currency);
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('other');
   const [groupId, setGroupId] = useState('');
@@ -148,6 +154,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
     if (open) {
       const f = initialForm({ editing, prefill, groups, me });
       setAmount(f.amount);
+      setCur(f.currency);
       setDescription(f.description);
       setCategory(f.category);
       setGroupId(f.groupId);
@@ -270,6 +277,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
       groupId: groupId || null,
       description: description.trim(),
       amount: total,
+      currency: cur,
       category,
       paidBy: [{ userId: payerId, amount: total }],
       splits: split.splits,
@@ -378,7 +386,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
                   <p className="num text-[48px] font-medium leading-none text-ink">
                     {new Intl.NumberFormat('en-IN', {
                       style: 'currency',
-                      currency,
+                      currency: cur,
                       maximumFractionDigits: 2,
                     }).format(total)}
                   </p>
@@ -402,7 +410,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
                     setValues(defaultValuesFor(mode, Number(v) || 0, selectedIds));
                   }
                 }}
-                currency={currency}
+                currency={cur}
                 autoFocus
                 error={touched ? errors.amount : ''}
               />
@@ -449,6 +457,28 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
               </div>
 
               <div className="px-4 py-3.5">
+                <GroupLabel
+                  action={
+                    cur !== currency ? (
+                      <Hint>{rateLabel(cur, currency, convert.rates) || 'converted for totals'}</Hint>
+                    ) : null
+                  }
+                >
+                  Currency
+                </GroupLabel>
+                <Picker
+                  title="What currency was this in?"
+                  value={cur}
+                  onChange={(next) => setCur(next || currency)}
+                  options={Object.values(CURRENCIES).map((c) => ({
+                    value: c.code,
+                    label: `${c.symbol}  ${c.code}`,
+                    sublabel: c.name,
+                  }))}
+                />
+              </div>
+
+              <div className="px-4 py-3.5">
                 <GroupLabel>Category</GroupLabel>
                 <CategoryPicker value={category} onChange={setCategory} />
               </div>
@@ -486,7 +516,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
                     {validItems.length} items ·{' '}
                     {new Intl.NumberFormat('en-IN', {
                       style: 'currency',
-                      currency,
+                      currency: cur,
                       maximumFractionDigits: 2,
                     }).format(total)}
                   </Hint>
@@ -578,7 +608,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
             </GroupLabel>
             <SplitEditor
               total={total}
-              currency={currency}
+              currency={cur}
               people={pool}
               selectedIds={selectedIds}
               onTogglePerson={togglePerson}

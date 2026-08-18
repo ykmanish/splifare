@@ -43,6 +43,7 @@ import {
   StatusPill,
 } from '@/components/ui/Blocks';
 import CodeBox from '@/components/ui/CodeBox';
+import FxNote from '@/components/ui/FxNote';
 import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
@@ -81,16 +82,18 @@ function emojiIcon(char) {
 
 /* ------------------------------------------------------------- expenses */
 
-function ExpenseRow({ expense, me, currency, personById, onEdit, onDelete }) {
+function ExpenseRow({ expense, me, personById, onEdit, onDelete }) {
   const cat = categoryOf(expense.category);
   const Icon = expense.listId ? ShoppingBasket : cat.icon;
   const payer = personById(expense.paidBy?.[0]?.userId);
   const isMe = payer.id === me?.id;
   const { net } = shareOf(expense, me?.id);
 
+  // Its own currency, so a €40 dinner never renders as "₹40".
+  const own = expense.currency;
   const sub = isMe
-    ? `You paid ${money(expense.amount, currency)}`
-    : `${firstName(payer.name)} paid ${money(expense.amount, currency)}`;
+    ? `You paid ${money(expense.amount, own)}`
+    : `${firstName(payer.name)} paid ${money(expense.amount, own)}`;
 
   return (
     <div className="flex items-center">
@@ -110,7 +113,7 @@ function ExpenseRow({ expense, me, currency, personById, onEdit, onDelete }) {
               <span
                 className={`num block text-[15px]  ${net > 0 ? 'text-pos' : 'text-neg'}`}
               >
-                {money(Math.abs(net), currency)}
+                {money(Math.abs(net), own)}
               </span>
               <span className="newq block text-[11px]">{net > 0 ? 'you lent' : 'you owe'}</span>
             </span>
@@ -147,6 +150,7 @@ export default function GroupDetailPage() {
     settlements,
     lists,
     currency,
+    convert,
     updateGroup,
     deleteGroup,
     leaveGroup,
@@ -174,14 +178,14 @@ export default function GroupDetailPage() {
 
   const data = useMemo(() => {
     if (!group) return null;
-    const ledger = buildLedger(expenses, settlements, group.id);
+    const ledger = buildLedger(expenses, settlements, group.id, convert);
     const mine = balancesFor(ledger, me.id);
     const nets = netByMember(ledger, group.memberIds);
     const transfers = simplify(nets);
     const groupExpenses = expenses.filter((e) => e.groupId === group.id);
     const total = groupExpenses.reduce((a, e) => a + e.amount, 0);
     return { ledger, mine, nets, transfers, groupExpenses, total };
-  }, [group, expenses, settlements, me]);
+  }, [group, expenses, settlements, me, convert]);
 
   if (!group) {
     return (
@@ -392,6 +396,7 @@ export default function GroupDetailPage() {
                 </p>
               )}
             </Card>
+            <FxNote scope={group.id} className="mt-2" />
           </Section>
 
           {/* ------------------------------------------------- room code */}
@@ -502,7 +507,6 @@ export default function GroupDetailPage() {
                             key={e.id}
                             expense={e}
                             me={me}
-                            currency={currency}
                             personById={personById}
                             onEdit={() => editExpense(e)}
                             onDelete={() => setDeletingExpense(e)}

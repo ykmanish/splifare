@@ -52,6 +52,7 @@ router.post(
       from,
       to,
       amount,
+      currency: String(req.body.currency || req.user.currency || 'INR').toUpperCase(),
       group: req.body.groupId || null,
       note: String(req.body.note || '').trim(),
       date: req.body.date ? new Date(req.body.date) : new Date(),

@@ -12,6 +12,7 @@ import {
   Monitor,
   Coins,
   Bell,
+  RefreshCw,
   LogOut,
   RotateCcw,
   Info,
@@ -31,6 +32,7 @@ import { AVATAR_OPTIONS } from '@/components/ui/Avatar';
 import { ActionTiles, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import { Badge, Switch } from '@/components/ui/Bits';
 import { useApp } from '@/store/AppContext';
+import { pushReason } from '@/lib/push';
 import { useToast } from '@/components/ui/Toast';
 import { CURRENCIES } from '@/lib/format';
 
@@ -73,7 +75,22 @@ function GroupNote({ icon: Icon, children }) {
 }
 
 export default function SettingsPage() {
-  const { me, prefs, setPrefs, setTheme, updateProfile, logout, reload, unreadCount } = useApp();
+  const {
+    me,
+    prefs,
+    setPrefs,
+    setTheme,
+    updateProfile,
+    logout,
+    reload,
+    unreadCount,
+    push,
+    enablePush,
+    disablePush,
+    testPush,
+    fx,
+    refreshRates,
+  } = useApp();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -94,14 +111,66 @@ export default function SettingsPage() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
 
-  // Local-only toggles — there is no backend to persist these against yet.
-  const [notif, setNotif] = useState({ expenses: true, payments: true, lists: true, reminders: false });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [ratesBusy, setRatesBusy] = useState(false);
 
   const activeTheme = THEMES.find((t) => t.id === prefs.theme) || THEMES[2];
-  const notifOn = Object.values(notif).filter(Boolean).length;
+
+  const pushOn = push.subscribed && push.permission === 'granted';
+  const pushBlocked = push.permission === 'denied';
+  const pushUnsupported = push.permission === 'unsupported';
+  const pushSummary = pushUnsupported
+    ? 'Unavailable'
+    : pushBlocked
+      ? 'Blocked'
+      : pushOn
+        ? 'On'
+        : 'Off';
   const handle = me.email
     ? `@${me.email.split('@')[0]}`
     : `@${String(me.name || 'you').toLowerCase().replace(/\s+/g, '')}`;
+
+  async function togglePush(next) {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (!next) {
+        await disablePush();
+        toast({ tone: 'info', title: 'Push turned off' });
+        return;
+      }
+      const result = await enablePush();
+      if (result.ok) {
+        toast({ title: 'Push notifications on', description: 'Try the test below.' });
+      } else {
+        toast({ tone: 'error', title: 'Could not turn push on', description: pushReason(result.reason) });
+      }
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not change push', description: err.message });
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function sendTestPush() {
+    try {
+      await testPush();
+      toast({ title: 'Test sent', description: 'It should arrive in a second or two.' });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Test failed', description: err.message });
+    }
+  }
+
+  async function onRefreshRates() {
+    if (ratesBusy) return;
+    setRatesBusy(true);
+    try {
+      await refreshRates(prefs.currency);
+      toast({ title: 'Rates refreshed' });
+    } finally {
+      setRatesBusy(false);
+    }
+  }
 
   async function saveProfile() {
     setSaving(true);
@@ -244,9 +313,25 @@ export default function SettingsPage() {
                 }))}
               />
             </div>
+            <FieldRow
+              icon={RefreshCw}
+              label="Exchange rates"
+              sublabel={
+                !fx.rates
+                  ? 'Not loaded yet'
+                  : fx.stale
+                    ? `Live rates unreachable — using ${fx.date || 'cached'}`
+                    : `${fx.date || 'today'} · ${fx.source}`
+              }
+              trailing={
+                <span className="newq text-[13px]">{ratesBusy ? 'Refreshing…' : 'Refresh'}</span>
+              }
+              onClick={onRefreshRates}
+            />
           </ListGroup>
           <GroupNote icon={Coins}>
-            Existing amounts are re-labelled, not converted — this is a display setting.
+            Every expense keeps the currency it was recorded in. Totals are converted into{' '}
+            {prefs.currency} at the latest rate, so a mixed-currency group still adds up.
           </GroupNote>
         </Section>
 
@@ -273,7 +358,7 @@ export default function SettingsPage() {
             <FieldRow
               icon={Bell}
               label="Notifications"
-              trailing={<span className="newq num text-[14px]">{notifOn} on</span>}
+              trailing={<span className="newq text-[14px]">{pushSummary}</span>}
               chevron
               onClick={() => setNotifOpen(true)}
             />
@@ -490,21 +575,46 @@ export default function SettingsPage() {
         subtitle="Choose what is worth interrupting you for."
       >
         <ListGroup tone="fill">
-          {NOTIF_ROWS.map((r) => (
-            <div key={r.id} className="px-4 py-3">
-              <Switch
-                id={r.key}
-                label={r.label}
-                description={r.description}
-                checked={notif[r.id]}
-                onChange={(v) => setNotif((n) => ({ ...n, [r.id]: v }))}
-              />
-            </div>
-          ))}
+          <div className="px-4 py-3">
+            <Switch
+              id="push-on"
+              label="Push notifications"
+              description={
+                pushUnsupported
+                  ? 'This browser cannot receive them.'
+                  : pushBlocked
+                    ? 'Blocked — allow notifications in your browser settings first.'
+                    : 'Arrive even when Splitta is closed.'
+              }
+              checked={pushOn}
+              disabled={pushBusy || pushUnsupported || pushBlocked}
+              onChange={togglePush}
+            />
+          </div>
         </ListGroup>
+
+        {pushOn && (
+          <div className="mt-3">
+            <Button variant="soft" size="sm" block icon={Bell} onClick={sendTestPush}>
+              Send a test notification
+            </Button>
+          </div>
+        )}
+
         <GroupNote icon={Bell}>
-          These switches are stored locally for now — delivery needs the backend.
+          {pushOn
+            ? 'You will be told about new expenses, payments, list activity and friend requests. Splitta also keeps checking in the background as a fallback.'
+            : 'With push off, updates only appear while Splitta is open in a tab.'}
         </GroupNote>
+
+        <div className="mt-6">
+          <GroupLabel>What you will hear about</GroupLabel>
+          <ListGroup tone="fill">
+            {NOTIF_ROWS.filter((r) => r.id !== 'reminders').map((r) => (
+              <FieldRow key={r.id} label={r.label} sublabel={r.description} />
+            ))}
+          </ListGroup>
+        </div>
       </Sheet>
 
       <ConfirmSheet

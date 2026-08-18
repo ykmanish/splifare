@@ -19,6 +19,7 @@ import {
   PersonRow,
 } from '@/components/ui/Blocks';
 import CodeBox, { spaceCode } from '@/components/ui/CodeBox';
+import FxNote from '@/components/ui/FxNote';
 import CreateGroupSheet from '@/components/groups/CreateGroupSheet';
 import JoinGroupSheet from '@/components/groups/JoinGroupSheet';
 import MemberSheet from '@/components/groups/MemberSheet';
@@ -380,7 +381,7 @@ function GroupTile({ group, index, currency, onEdit, onDelete }) {
 /* ------------------------------------------------------------------ list */
 
 function GroupsInner() {
-  const { me, groups, people, expenses, settlements, currency, deleteGroup } = useApp();
+  const { me, groups, people, expenses, settlements, currency, convert, deleteGroup } = useApp();
   const { toast } = useToast();
   const params = useSearchParams();
 
@@ -393,13 +394,13 @@ function GroupsInner() {
 
   const all = useMemo(() => {
     return groups.map((g) => {
-      const ledger = buildLedger(expenses, settlements, g.id);
+      const ledger = buildLedger(expenses, settlements, g.id, convert);
       const { net } = balancesFor(ledger, me.id);
       const members = g.memberIds.map((id) => people.find((p) => p.id === id)).filter(Boolean);
       const count = expenses.filter((e) => e.groupId === g.id).length;
       return { ...g, net, members, count };
     });
-  }, [groups, expenses, settlements, people, me]);
+  }, [groups, expenses, settlements, people, me, convert]);
 
   const rows = useMemo(
     () => all.filter((g) => g.name.toLowerCase().includes(q.trim().toLowerCase())),
@@ -452,6 +453,7 @@ function GroupsInner() {
                 <p className="newq text-[12.5px]">you owe</p>
               </div>
             </Card>
+            <FxNote className="mt-2" />
           </motion.div>
         )}
 

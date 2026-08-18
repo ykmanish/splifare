@@ -2,6 +2,9 @@ import { round2 } from './format';
 
 const EPS = 0.005;
 
+/** Default converter: leave the amount exactly as recorded. */
+const identity = (amount) => Number(amount) || 0;
+
 /* ------------------------------------------------------------------
    A ledger is  { [debtorId]: { [creditorId]: amount } }
    meaning "debtor owes creditor amount". Adding an edge automatically
@@ -25,14 +28,21 @@ function addEdge(ledger, from, to, amount) {
   ledger[from][to] = round2((ledger[from][to] || 0) + amount);
 }
 
-/** Per-expense: who ends up owing whom, given payers and splits. */
-function edgesForExpense(expense) {
+/**
+ * Per-expense: who ends up owing whom, given payers and splits.
+ *
+ * `convert` normalises every figure into the viewer's currency first. An
+ * expense carries its own currency, so without this step a €20 dinner and a
+ * ₹20 chai would net against each other as equals.
+ */
+function edgesForExpense(expense, convert) {
+  const cur = expense.currency;
   const net = {};
   for (const p of expense.paidBy || []) {
-    net[p.userId] = round2((net[p.userId] || 0) + (Number(p.amount) || 0));
+    net[p.userId] = round2((net[p.userId] || 0) + convert(p.amount, cur));
   }
   for (const s of expense.splits || []) {
-    net[s.userId] = round2((net[s.userId] || 0) - (Number(s.amount) || 0));
+    net[s.userId] = round2((net[s.userId] || 0) - convert(s.amount, cur));
   }
 
   const creditors = Object.entries(net)
@@ -62,22 +72,25 @@ function edgesForExpense(expense) {
 
 /**
  * Build the full pairwise ledger from expenses + settlements.
+ *
  * `scope` optionally narrows to a single group id (use `null` for
- * non-group expenses, or omit for everything).
+ * non-group expenses, or omit for everything). `convert` maps an amount from
+ * the currency it was recorded in into the one being displayed; it defaults
+ * to identity so a single-currency account behaves exactly as before.
  */
-export function buildLedger(expenses = [], settlements = [], scope = undefined) {
+export function buildLedger(expenses = [], settlements = [], scope = undefined, convert = identity) {
   const inScope = (x) => scope === undefined || (x.groupId || null) === scope;
   const ledger = {};
 
   for (const e of expenses) {
     if (!inScope(e)) continue;
-    for (const edge of edgesForExpense(e)) addEdge(ledger, edge.from, edge.to, edge.amount);
+    for (const edge of edgesForExpense(e, convert)) addEdge(ledger, edge.from, edge.to, edge.amount);
   }
 
   // A settlement is money actually handed over: it pays down a debt.
   for (const s of settlements) {
     if (!inScope(s)) continue;
-    addEdge(ledger, s.toUserId, s.fromUserId, round2(Number(s.amount) || 0));
+    addEdge(ledger, s.toUserId, s.fromUserId, round2(convert(s.amount, s.currency)));
   }
 
   return ledger;
@@ -161,14 +174,22 @@ export function simplify(netMap) {
   return transfers;
 }
 
-/** How much of an expense a given user personally carried. */
-export function shareOf(expense, userId) {
+/**
+ * How much of an expense a given user personally carried.
+ *
+ * Left in the expense's own currency by default, because a single row is
+ * exact and should be shown as recorded — callers format it with
+ * `expense.currency`, not the display currency. Pass `convert` only when the
+ * figure is about to be added to others.
+ */
+export function shareOf(expense, userId, convert = identity) {
+  const cur = expense.currency;
   const paid = (expense.paidBy || []).reduce(
-    (a, p) => (p.userId === userId ? a + (Number(p.amount) || 0) : a),
+    (a, p) => (p.userId === userId ? a + convert(p.amount, cur) : a),
     0,
   );
   const owed = (expense.splits || []).reduce(
-    (a, s) => (s.userId === userId ? a + (Number(s.amount) || 0) : a),
+    (a, s) => (s.userId === userId ? a + convert(s.amount, cur) : a),
     0,
   );
   return { paid: round2(paid), owed: round2(owed), net: round2(paid - owed) };

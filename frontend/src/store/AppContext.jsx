@@ -24,6 +24,15 @@ import {
   normFriendRequest,
 } from '@/lib/api';
 import { buildLedger, balancesFor } from '@/lib/balances';
+import { makeConverter, noConvert } from '@/lib/fx';
+import {
+  registerServiceWorker,
+  currentSubscription,
+  enablePush,
+  disablePush,
+  permissionState,
+  pushSupported,
+} from '@/lib/push';
 import { round2 } from '@/lib/format';
 
 const THEME_KEY = 'splitta.theme';
@@ -97,6 +106,13 @@ export function AppProvider({ children }) {
   const [syncing, setSyncing] = useState(false);
   const [offline, setOffline] = useState(false);
 
+  /** Live FX table, keyed on the viewer's own currency. */
+  const [fx, setFx] = useState({ base: null, date: null, rates: null, source: '', stale: false });
+
+  /** 'granted' | 'denied' | 'default' | 'unsupported', plus whether this
+      browser currently holds a subscription. */
+  const [push, setPush] = useState({ permission: 'default', subscribed: false, ready: false });
+
   const patchData = useCallback((patch) => setData((d) => ({ ...d, ...patch })), []);
 
   /* ---------------------------------------------------- loading */
@@ -143,6 +159,27 @@ export function AppProvider({ children }) {
     }
   }, []);
 
+  /**
+   * Pull the rate table for a display currency. Failure is survivable — the
+   * converter falls back to identity, which is exactly right for the common
+   * case of an account whose expenses are all in one currency.
+   */
+  const loadRates = useCallback(async (base) => {
+    if (!base) return;
+    try {
+      const table = await api.rates(base);
+      setFx({
+        base: table.base,
+        date: table.date,
+        rates: table.rates,
+        source: table.source,
+        stale: !!table.stale,
+      });
+    } catch {
+      setFx((f) => (f.base === base ? f : { base: null, date: null, rates: null, source: '', stale: true }));
+    }
+  }, []);
+
   /** Refresh only the slices an action touched. */
   const refresh = useCallback(
     async (keys = ['expenses', 'settlements', 'notifications', 'activity']) => {
@@ -181,7 +218,10 @@ export function AppProvider({ children }) {
       }
       try {
         const { user } = await api.me();
-        setMe(normUser(user));
+        const mine = normUser(user);
+        setMe(mine);
+        // Rates run alongside the main load rather than gating it.
+        loadRates(mine.currency);
         await loadAll();
       } catch {
         /* loadAll already handled 401 / offline */
@@ -189,7 +229,50 @@ export function AppProvider({ children }) {
         setReady(true);
       }
     })();
-  }, [loadAll]);
+  }, [loadAll, loadRates]);
+
+  /* ---------------------------------------------------- push */
+
+  /**
+   * Register the worker and read back whether this browser is already
+   * subscribed. Registration is safe to do unconditionally — it does not
+   * prompt; only enablePush() does, and that needs a user gesture.
+   */
+  useEffect(() => {
+    if (!ready || !me) return;
+    let stopped = false;
+
+    (async () => {
+      if (!pushSupported()) {
+        if (!stopped) setPush({ permission: 'unsupported', subscribed: false, ready: true });
+        return;
+      }
+      await registerServiceWorker();
+      const sub = await currentSubscription();
+      if (!stopped) {
+        setPush({ permission: permissionState(), subscribed: !!sub, ready: true });
+      }
+    })();
+
+    return () => {
+      stopped = true;
+    };
+  }, [ready, me]);
+
+  /* A push service can rotate a subscription; the worker tells us to redo it. */
+  useEffect(() => {
+    if (!ready || !me || !pushSupported()) return;
+
+    const onMessage = (event) => {
+      if (event.data?.type !== 'push-resubscribe') return;
+      enablePush()
+        .then((r) => setPush((prev) => ({ ...prev, subscribed: !!r.ok })))
+        .catch(() => {});
+    };
+
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [ready, me]);
 
   /* ---------------------------------------------------- live updates */
 
@@ -198,6 +281,8 @@ export function AppProvider({ children }) {
    * a websocket: poll while the tab is visible, and catch up immediately
    * whenever it regains focus.
    */
+  const pushLive = push.subscribed && push.permission === 'granted';
+
   useEffect(() => {
     if (!ready || !me) return;
 
@@ -228,7 +313,9 @@ export function AppProvider({ children }) {
       }
     };
 
-    const interval = setInterval(tick, 15000);
+    // With push delivering, the poll is only a safety net for missed
+    // messages, so it drops to a fifth of the rate.
+    const interval = setInterval(tick, pushLive ? 75000 : 15000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') tick();
     };
@@ -241,7 +328,7 @@ export function AppProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [ready, me]);
+  }, [ready, me, pushLive]);
 
   /* ---------------------------------------------------- theme */
 
@@ -288,9 +375,19 @@ export function AppProvider({ children }) {
     [me, friends],
   );
 
+  /**
+   * Every amount is netted in the viewer's currency. Until the rate table
+   * lands this is identity, so totals for a single-currency account are
+   * correct from the first frame instead of flickering.
+   */
+  const convert = useMemo(
+    () => (fx.rates && fx.base ? makeConverter(fx.base, fx.rates) : noConvert),
+    [fx.base, fx.rates],
+  );
+
   const ledger = useMemo(
-    () => buildLedger(data.expenses, data.settlements),
-    [data.expenses, data.settlements],
+    () => buildLedger(data.expenses, data.settlements, undefined, convert),
+    [data.expenses, data.settlements, convert],
   );
 
   const overview = useMemo(
@@ -381,12 +478,16 @@ export function AppProvider({ children }) {
 
       updateProfile: async (patch) => {
         const { user } = await api.updateProfile(patch);
-        setMe(normUser(user));
+        const next = normUser(user);
+        setMe(next);
+        // A new display currency needs its own rate table.
+        if (patch.currency) loadRates(next.currency);
       },
 
       setPrefs: async (patch) => {
         setMe((m) => ({ ...m, ...patch })); // optimistic, theme applies instantly
         await api.updateProfile(patch).catch(() => {});
+        if (patch.currency) loadRates(patch.currency);
       },
       setTheme: async (theme) => {
         setMe((m) => ({ ...m, theme }));
@@ -503,11 +604,12 @@ export function AppProvider({ children }) {
       },
 
       /* ---- settlements ---- */
-      settleUp: async ({ fromUserId, toUserId, amount, groupId, note }) => {
+      settleUp: async ({ fromUserId, toUserId, amount, currency: cur, groupId, note }) => {
         const { settlement } = await api.createSettlement({
           fromUserId,
           toUserId,
           amount: round2(amount),
+          currency: cur,
           groupId: groupId || null,
           note,
         });
@@ -576,6 +678,27 @@ export function AppProvider({ children }) {
         await refresh(['lists']);
       },
 
+      /* ---- push ---- */
+      enablePush: async () => {
+        const result = await enablePush();
+        setPush({
+          permission: permissionState(),
+          subscribed: !!result.ok,
+          ready: true,
+        });
+        return result;
+      },
+
+      disablePush: async () => {
+        await disablePush();
+        setPush({ permission: permissionState(), subscribed: false, ready: true });
+      },
+
+      testPush: () => api.pushTest(),
+
+      /* ---- currency ---- */
+      refreshRates: (base) => loadRates(base),
+
       /* ---- notifications ---- */
       markRead: async (nid) => {
         setData((d) => ({
@@ -596,7 +719,7 @@ export function AppProvider({ children }) {
         await api.clearNotifications().catch(() => {});
       },
     }),
-    [loadAll, refresh, updateItem],
+    [loadAll, refresh, updateItem, loadRates],
   );
 
   const value = useMemo(
@@ -612,6 +735,9 @@ export function AppProvider({ children }) {
       friends,
       splitPool,
       requestCount: data.incoming.length,
+      fx,
+      convert,
+      push,
       ledger,
       overview,
       unreadCount,
@@ -627,6 +753,9 @@ export function AppProvider({ children }) {
       data,
       friends,
       splitPool,
+      fx,
+      convert,
+      push,
       ledger,
       overview,
       unreadCount,
