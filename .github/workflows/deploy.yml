@@ -16,5 +16,38 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          # The deploy steps live here rather than in ~/deploy-splitta.sh on the
+          # box, so they are reviewable and revertable alongside the code they
+          # ship. Inlined rather than calling a script from the repo on purpose:
+          # the reset below rewrites the working tree, and bash reads a script
+          # file incrementally, so a script cannot safely replace itself.
           script: |
-            ~/deploy-splitta.sh
+            set -euo pipefail
+
+            cd ~/splitta
+
+            # Reset rather than pull. `npm ci` keeps the tree clean, so this
+            # should be a no-op — but any drift at all would otherwise abort
+            # the merge, which is exactly how a server-rewritten
+            # package-lock.json used to break every deploy. Ignored files
+            # (.env, node_modules) are left alone.
+            git fetch origin main
+            git reset --hard origin/main
+
+            # `npm ci` installs strictly from the lockfile and never rewrites
+            # it, unlike `npm install`. That is what keeps the tree clean for
+            # the next deploy.
+            cd ~/splitta/backend
+            npm ci --omit=dev
+            pm2 restart splitta-backend --update-env \
+              || pm2 start server.js --name splitta-backend
+
+            # No --omit=dev here: tailwind and the babel plugin are
+            # devDependencies and `next build` needs them.
+            cd ~/splitta/frontend
+            npm ci
+            npm run build
+            pm2 restart splitta-frontend --update-env \
+              || pm2 start npm --name splitta-frontend -- start
+
+            pm2 save
