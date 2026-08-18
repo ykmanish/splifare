@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import StatusSheet from '@/components/ui/StatusSheet';
 import Button from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import SplitEditor from './SplitEditor';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { haptics } from '@/lib/haptics';
+import { readExpenseDraft, writeExpenseDraft, clearExpenseDraft } from '@/lib/draft';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
 import { firstName, CURRENCIES } from '@/lib/format';
 import { rateLabel } from '@/lib/fx';
@@ -126,6 +127,8 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** True when this opening was seeded from a saved draft rather than fresh. */
+  const [restored, setRestored] = useState(false);
   const [status, setStatus] = useState(null);
   const [saved, setSaved] = useState({ title: '', body: '' });
 
@@ -153,24 +156,89 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
     setWasOpen(open);
 
     if (open) {
-      const f = initialForm({ editing, prefill, groups, me });
-      setAmount(f.amount);
-      setCur(f.currency);
-      setDescription(f.description);
-      setCategory(f.category);
-      setGroupId(f.groupId);
-      setPayerId(f.payerId);
-      setSelectedIds(f.selectedIds);
-      setMode(f.mode);
-      setValues(f.values);
-      setDate(f.date);
-      setNotes(f.notes);
-      setItemized(f.itemized);
-      setItems(f.items);
+      // An edit is always seeded from the expense itself — a stale draft has
+      // no business overwriting a bill that already exists.
+      const draft = editing ? null : readExpenseDraft();
+      const f = draft || initialForm({ editing, prefill, groups, me });
+
+      applyForm(f);
       setTouched(false);
       setConfirmDelete(false);
+      setRestored(!!draft);
     }
   }
+
+  /** Pushes a whole form object into state — used by seeding and by discard. */
+  function applyForm(f) {
+    setAmount(f.amount ?? '');
+    setCur(f.currency || currency);
+    setDescription(f.description ?? '');
+    setCategory(f.category ?? 'other');
+    setGroupId(f.groupId ?? '');
+    setPayerId(f.payerId ?? me?.id);
+    setSelectedIds(f.selectedIds ?? [me?.id]);
+    setMode(f.mode ?? 'equal');
+    setValues(f.values ?? {});
+    setDate(f.date ?? new Date().toISOString());
+    setNotes(f.notes ?? '');
+    setItemized(!!f.itemized);
+    setItems(f.items?.length ? f.items : [{ id: crypto.randomUUID(), name: '', price: '' }]);
+  }
+
+  /** Throw the draft away and start from what this opening would have shown. */
+  function startFresh() {
+    clearExpenseDraft();
+    applyForm(initialForm({ editing: null, prefill, groups, me }));
+    setTouched(false);
+    setRestored(false);
+  }
+
+  /* -------------------------------------------------- draft */
+
+  /*
+   * Written on a short delay so a burst of keystrokes is one write, and only
+   * for a new expense. Writing to storage is not a state update, so this
+   * effect cannot cascade a render.
+   */
+  useEffect(() => {
+    if (!open || editing) return undefined;
+
+    const t = setTimeout(() => {
+      writeExpenseDraft({
+        amount,
+        currency: cur,
+        description,
+        category,
+        groupId,
+        payerId,
+        selectedIds,
+        mode,
+        values,
+        date,
+        notes,
+        itemized,
+        items,
+      });
+    }, 400);
+
+    return () => clearTimeout(t);
+  }, [
+    open,
+    editing,
+    amount,
+    cur,
+    description,
+    category,
+    groupId,
+    payerId,
+    selectedIds,
+    mode,
+    values,
+    date,
+    notes,
+    itemized,
+    items,
+  ]);
 
   /* -------------------------------------------------- success flash */
 
@@ -297,6 +365,9 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
         setSaved({ title: 'Changes saved', body: payload.description });
       } else {
         await addExpense(payload);
+        // Saved for real, so the draft has done its job.
+        clearExpenseDraft();
+        setRestored(false);
         haptics.success();
         const others = split.splits.length - 1;
         setSaved({
@@ -375,6 +446,29 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
               ) : null
             }
           />
+
+          {restored && (
+            <Section i={0}>
+              <div className="flex items-center gap-3 rounded-[16px] bg-sky px-4 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="newq text-ink block text-[13.5px]">Picked up where you left off</span>
+                  <span className="newq block text-[12px]">
+                    This bill was still unsaved from last time.
+                  </span>
+                </span>
+                <Button
+                  type="button"
+                  variant="onTone"
+                  size="xs"
+                  icon={RotateCcw}
+                  className="shrink-0"
+                  onClick={startFresh}
+                >
+                  Start fresh
+                </Button>
+              </div>
+            </Section>
+          )}
 
           {/* -------------------------------------------------- amount */}
           <Section i={0}>

@@ -450,15 +450,10 @@ function ListDetailInner() {
                         )}
                       </button>
 
-                      <motion.button
-                        type="button"
-                        whileTap={{ scale: 0.97 }}
-                        transition={SPRING}
-                        onClick={() => setAssigning(item)}
-                        aria-label={`Change who ${item.name} is for`}
-                        className="shrink-0 rounded-full p-1 tap hover:bg-surface-2"
-                      >
-                        {everyone ? (
+                      {/* Once the list is an expense, who each item was for is
+                          history — shown, but no longer a control. */}
+                      {(() => {
+                        const shares = everyone ? (
                           <Badge tone="brandSoft" icon={Users}>
                             All
                           </Badge>
@@ -468,8 +463,23 @@ function ListDetailInner() {
                           </Badge>
                         ) : (
                           <AvatarStack people={who} size="xs" max={3} />
-                        )}
-                      </motion.button>
+                        );
+
+                        return completed ? (
+                          <span className="shrink-0 p-1">{shares}</span>
+                        ) : (
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.97 }}
+                            transition={SPRING}
+                            onClick={() => setAssigning(item)}
+                            aria-label={`Change who ${item.name} is for`}
+                            className="shrink-0 rounded-full p-1 tap hover:bg-surface-2"
+                          >
+                            {shares}
+                          </motion.button>
+                        );
+                      })()}
 
                       <ChevronRight
                         size={17}
@@ -506,6 +516,7 @@ function ListDetailInner() {
           open={renameOpen}
           onClose={() => setRenameOpen(false)}
           item={renaming.item}
+          readOnly={completed}
           onSave={onSaveItem}
           onDelete={
             completed
@@ -531,6 +542,7 @@ function ListDetailInner() {
       <ListSettingsSheet
         open={editing}
         onClose={closeSettings}
+        readOnly={completed}
         list={list}
         groups={groups}
         people={people}
@@ -568,7 +580,7 @@ export default function ListDetailPage() {
 /* ------------------------------------------------------------------ */
 
 /** Inline item edit — rename, retune the quantity, move it to another aisle. */
-function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
+function ItemEditSheet({ open, onClose, item, onSave, onDelete, readOnly = false }) {
   // Remounted with a fresh `key` every time an item is picked, so the draft
   // always starts from that item — no reset effect needed.
   const [name, setName] = useState(item?.name || '');
@@ -589,50 +601,69 @@ function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
       subtitle={`${item.qty} ${item.unit}`}
       size="sm"
       footer={
-        <div className="flex gap-2.5">
-          <Button variant="soft" size="md" onClick={onClose} className="flex-1">
-            Cancel
+        readOnly ? (
+          <Button variant="soft" size="md" block onClick={onClose}>
+            Close
           </Button>
-          <Button
-            size="md"
-            className="flex-[2]"
-            disabled={!trimmed}
-            onClick={() =>
-              onSave({
-                name: trimmed || item.name,
-                qty: Number(qty) || 1,
-                unit,
-                aisle,
-                note: note.trim(),
-              })
-            }
-          >
-            Save item
-          </Button>
-        </div>
+        ) : (
+          <div className="flex gap-2.5">
+            <Button variant="soft" size="md" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              size="md"
+              className="flex-[2]"
+              disabled={!trimmed}
+              onClick={() =>
+                onSave({
+                  name: trimmed || item.name,
+                  qty: Number(qty) || 1,
+                  unit,
+                  aisle,
+                  note: note.trim(),
+                })
+              }
+            >
+              Save item
+            </Button>
+          </div>
+        )
       }
     >
       <div className="space-y-5">
+        {readOnly && (
+          <StatusPill tone="pos" icon={Check}>
+            This list is checked out — items are read-only
+          </StatusPill>
+        )}
+
         <Input
           label="Item"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Tomatoes"
-          autoFocus
+          autoFocus={!readOnly}
+          disabled={readOnly}
         />
 
         <div>
           <Label hint={unit}>Quantity</Label>
-          <div className="flex items-center gap-3">
-            <Stepper value={qty} onChange={setQty} min={1} max={999} label="quantity" />
-            <Picker
-              title="Unit"
-              value={unit}
-              onChange={setUnit}
-              options={UNIT_OPTIONS}
-              className="min-w-0 flex-1"
-            />
-          </div>
+          {readOnly ? (
+            <p className="num text-ink text-[17px]">
+              {qty} {unit}
+            </p>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Stepper value={qty} onChange={setQty} min={1} max={999} label="quantity" />
+              <Picker
+                title="Unit"
+                value={unit}
+                onChange={setUnit}
+                options={UNIT_OPTIONS}
+                className="min-w-0 flex-1"
+              />
+            </div>
+          )}
         </div>
 
         <Picker
@@ -641,6 +672,7 @@ function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
           value={aisle}
           onChange={setAisle}
           options={AISLE_OPTIONS}
+          disabled={readOnly}
         />
 
         <Input
@@ -649,6 +681,7 @@ function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Ripe ones, not the green"
+          disabled={readOnly}
         />
 
         {/* Removal lives here now that the row opens this sheet — it replaces
@@ -678,6 +711,7 @@ function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
 function ListSettingsSheet({
   open,
   onClose,
+  readOnly = false,
   list,
   groups,
   people,
@@ -735,19 +769,41 @@ function ListSettingsSheet({
       title="List settings"
       subtitle={list.name}
       footer={
-        <div className="flex gap-2.5">
-          <Button variant="soft" size="md" onClick={onClose} className="flex-1">
-            Cancel
+        readOnly ? (
+          <Button variant="soft" size="md" block onClick={onClose}>
+            Close
           </Button>
-          <Button size="md" onClick={save} loading={busy} className="flex-[2]">
-            Save
-          </Button>
-        </div>
+        ) : (
+          <div className="flex gap-2.5">
+            <Button variant="soft" size="md" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button size="md" onClick={save} loading={busy} className="flex-[2]">
+              Save
+            </Button>
+          </div>
+        )
       }
     >
       <div className="space-y-5">
-        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label="Store" icon={Store} value={store} onChange={(e) => setStore(e.target.value)} />
+        {readOnly && (
+          <StatusPill tone="pos" icon={Check}>
+            Checked out — these details are read-only
+          </StatusPill>
+        )}
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={readOnly}
+        />
+        <Input
+          label="Store"
+          icon={Store}
+          value={store}
+          onChange={(e) => setStore(e.target.value)}
+          disabled={readOnly}
+        />
         <Input
           label="Budget"
           hint="optional"
@@ -755,6 +811,7 @@ function ListSettingsSheet({
           suffix={symbolOf(currency)}
           value={budget}
           onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))}
+          disabled={readOnly}
         />
         <Picker
           label="Group"
@@ -765,6 +822,7 @@ function ListSettingsSheet({
           value={groupId}
           onChange={setGroupId}
           options={groups.map((g) => ({ value: g.id, label: g.name, emoji: g.emoji }))}
+          disabled={readOnly}
         />
 
         <div>
@@ -776,7 +834,7 @@ function ListSettingsSheet({
                 person={{ ...p, name: p.id === meId ? 'You' : p.name }}
                 subtitle={p.id === meId ? 'You — always on the list' : undefined}
                 selected={memberIds.includes(p.id)}
-                disabled={p.id === meId}
+                disabled={readOnly || p.id === meId}
                 onToggle={(pid) =>
                   setMemberIds((m) => (m.includes(pid) ? m.filter((x) => x !== pid) : [...m, pid]))
                 }
