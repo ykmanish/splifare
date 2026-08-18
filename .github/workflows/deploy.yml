@@ -35,17 +35,27 @@ jobs:
             git reset --hard origin/main
 
             # `npm ci` installs strictly from the lockfile and never rewrites
-            # it, unlike `npm install`. That is what keeps the tree clean for
-            # the next deploy.
+            # it, unlike a bare `npm install`. That is what keeps the tree
+            # clean for the next deploy. The backend's tree is small and
+            # stays in sync, so it gets the strict treatment.
             cd ~/splitta/backend
             npm ci --omit=dev
             pm2 restart splitta-backend --update-env \
               || pm2 start server.js --name splitta-backend
 
-            # No --omit=dev here: tailwind and the babel plugin are
+            # The frontend uses --no-save instead, and deliberately so.
+            # `npm ci` demands the lockfile match its own resolution exactly,
+            # and this box's npm disagrees with the one that writes the
+            # lockfile about sharp's wasm fallback (@emnapi/*) — a subtree
+            # nothing here even uses, since the app renders plain <img>.
+            # --no-save resolves fresh, so it is immune to that disagreement,
+            # and still never writes the lockfile, which is the property that
+            # actually mattered.
+            #
+            # No --omit=dev: tailwind and the babel plugin are
             # devDependencies and `next build` needs them.
             cd ~/splitta/frontend
-            npm ci
+            npm install --no-save
             npm run build
             pm2 restart splitta-frontend --update-env \
               || pm2 start npm --name splitta-frontend -- start
