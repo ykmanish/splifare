@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   api,
   getToken,
@@ -60,6 +61,12 @@ function applyTheme(theme) {
   appleStatusMeta.setAttribute('content', dark ? 'black-translucent' : 'default');
 }
 
+function syncThemeChrome(theme) {
+  applyTheme(theme);
+  requestAnimationFrame(() => applyTheme(theme));
+  setTimeout(() => applyTheme(theme), 120);
+}
+
 if (typeof window !== 'undefined') {
   try {
     applyTheme(localStorage.getItem(THEME_KEY) || 'system');
@@ -79,6 +86,7 @@ const EMPTY = {
 };
 
 export function AppProvider({ children }) {
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [me, setMe] = useState(null);
   const [data, setData] = useState(EMPTY);
@@ -222,7 +230,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (!ready) return;
-    applyTheme(prefs.theme);
+    syncThemeChrome(prefs.theme);
     try {
       localStorage.setItem(THEME_KEY, prefs.theme);
     } catch {
@@ -230,10 +238,10 @@ export function AppProvider({ children }) {
     }
     if (prefs.theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => applyTheme('system');
+    const onChange = () => syncThemeChrome('system');
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
-  }, [ready, prefs.theme]);
+  }, [pathname, ready, prefs.theme]);
 
   /* ---------------------------------------------------- derived */
 
