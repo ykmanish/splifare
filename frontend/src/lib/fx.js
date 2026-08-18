@@ -71,6 +71,7 @@ export function rateLabel(from, to, rates) {
 
   const per = 1 / rate;
   const symbol = (CURRENCIES[to] || CURRENCIES.INR).symbol;
-  const digits = per >= 100 ? 0 : per >= 1 ? 2 : 4;
+  // Two places for anything above 1; sub-unit rates need more to say anything.
+  const digits = per >= 1 ? 2 : 4;
   return `1 ${String(from).toUpperCase()} = ${symbol}${per.toFixed(digits)}`;
 }
