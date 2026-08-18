@@ -1,17 +1,26 @@
 'use client';
 
 import { Suspense, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, KeyRound, Plus, Sparkles, UsersRound, UserPlus } from 'lucide-react';
+import {
+  ChevronRight,
+  KeyRound,
+  Plus,
+  QrCode,
+  ScanLine,
+  UsersRound,
+  UserPlus,
+} from 'lucide-react';
 import Page from '@/components/layout/Page';
 import Button from '@/components/ui/Button';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import { Input, Label, SearchInput } from '@/components/ui/Field';
 
+import { AvatarStack } from '@/components/ui/Avatar';
 import { Badge, Card, EmptyState, RowMenu, cycleTone } from '@/components/ui/Bits';
 import {
-  AvatarCluster,
   CoralFab,
   FieldRow,
   GroupLabel,
@@ -27,7 +36,7 @@ import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor } from '@/lib/balances';
-import { money, firstName } from '@/lib/format';
+import { money, firstName, splitAmount } from '@/lib/format';
 import { GROUP_EMOJIS } from '@/lib/categories';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -288,7 +297,7 @@ function EditGroupSheet({ group, onClose }) {
  * The FAB has two jobs now — start a circle, or walk into one someone else
  * started — so it asks which before opening either form.
  */
-function StartSheet({ open, onClose, onCreate, onJoin }) {
+function StartSheet({ open, onClose, onCreate, onJoin, onScan }) {
   return (
     <Sheet
       open={open}
@@ -298,10 +307,13 @@ function StartSheet({ open, onClose, onCreate, onJoin }) {
       size="sm"
     >
       <ListGroup tone="fill">
+        {/* Near-black on full lime, not lime on pale lime — that pairing was
+            1.13:1 and effectively invisible. It also makes Create read as the
+            primary action of the three, which it is. */}
         <FieldRow
-          icon={Sparkles}
-          iconTint="var(--brand)"
-          iconBg="var(--brand-soft)"
+          icon={Plus}
+          iconTint="var(--text)"
+          iconBg="var(--brand)"
           label="Create a group"
           sublabel="You get a room code to share"
           chevron
@@ -322,6 +334,18 @@ function StartSheet({ open, onClose, onCreate, onJoin }) {
             onJoin();
           }}
         />
+        <FieldRow
+          icon={ScanLine}
+          iconTint="var(--violet)"
+          iconBg="var(--grape)"
+          label="Scan a QR code"
+          sublabel="Point your camera at their code"
+          chevron
+          onClick={() => {
+            onClose();
+            onScan();
+          }}
+        />
       </ListGroup>
     </Sheet>
   );
@@ -329,52 +353,70 @@ function StartSheet({ open, onClose, onCreate, onJoin }) {
 
 /* ------------------------------------------------------------------ tile */
 
+/**
+ * One group as a full-width strip.
+ *
+ * A two-up grid of tall tiles gave each group a tiny column to fit a name, a
+ * head count, a code and a balance into — everything truncated and the second
+ * column sat empty whenever the count was odd. Across the full width the same
+ * facts line up in one scannable row: icon, who and where, balance.
+ */
 function GroupTile({ group, index, currency, onEdit, onDelete }) {
   const settled = Math.abs(group.net) < 0.005;
+  const people = group.members.length;
 
   return (
-    <Card tone={cycleTone(index)} pad={false} className="px-3 pb-4 pt-2.5">
-      <div className="absolute right-1 top-1 z-10">
+    <Card tone={cycleTone(index)} pad={false} className="px-3.5 py-3">
+      <div className="flex items-center gap-3">
+        {/* The whole row navigates; the menu sits outside the link so its own
+            taps do not follow it. */}
+        <Link
+          href={`/groups/${group.id}`}
+          className="flex min-w-0 flex-1 items-center gap-3 tap active:scale-[0.99]"
+        >
+          <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-white/70 text-[23px]">
+            {group.emoji}
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="newq text-ink block truncate text-[15.5px]">{group.name}</span>
+            <span className="mt-0.5 flex min-w-0 items-center gap-2">
+              <AvatarStack people={group.members} size="xs" max={3} />
+              <span className="newq truncate text-[12px]">
+                {people} {people === 1 ? 'person' : 'people'}
+                {group.code ? ` · ${spaceCode(group.code)}` : ''}
+              </span>
+            </span>
+          </span>
+
+          <span className="shrink-0 pl-1 text-right">
+            {settled ? (
+              <Badge tone="onTone">Settled</Badge>
+            ) : (
+              <>
+                {/* Ink, not pos/neg: green or red on a saturated pastel lands
+                    at about 2:1 contrast. The caption carries the direction,
+                    which is how the friend cards already read. */}
+                <span className="num block text-[16px] text-ink">
+                  {money(Math.abs(group.net), currency)}
+                </span>
+                <span className="newq block text-[11px]">
+                  {group.net > 0 ? 'you are owed' : 'you owe'}
+                </span>
+              </>
+            )}
+          </span>
+        </Link>
+
         <RowMenu
           title={group.name}
-          subtitle={`${group.members.length} people · ${group.count} expenses`}
+          subtitle={`${people} people · ${group.count} expenses`}
           editLabel="Edit group"
           deleteLabel="Delete group"
+          className="-mr-1"
           onEdit={onEdit}
           onDelete={onDelete}
         />
-      </div>
-
-      <AvatarCluster
-        people={group.members}
-        label={group.name}
-        sublabel={`${group.members.length} ${group.members.length === 1 ? 'person' : 'people'}`}
-        href={`/groups/${group.id}`}
-        size={100}
-      />
-
-      {group.code && (
-        <p className="newq num mt-2 text-center text-[11px] uppercase tracking-[0.12em] text-ink-3">
-          {spaceCode(group.code)}
-        </p>
-      )}
-
-      <div className="mt-3 text-center">
-        {settled ? (
-          <Badge tone="onTone">Settled</Badge>
-        ) : (
-          <>
-            {/* Ink, not pos/neg: green or red on a saturated pastel lands at
-                about 2:1 contrast. The caption below carries the direction,
-                which is how the friend cards already read. */}
-            <span className="num block text-[16.5px] text-ink">
-              {money(Math.abs(group.net), currency)}
-            </span>
-            <span className="newq block text-[11.5px]">
-              {group.net > 0 ? 'you are owed' : 'you owe'}
-            </span>
-          </>
-        )}
       </div>
     </Card>
   );
@@ -392,6 +434,8 @@ function GroupsInner() {
   const joinParam = params.get('join') || '';
   const [creating, setCreating] = useState(params.get('new') === '1');
   const [joining, setJoining] = useState(!!joinParam);
+  /** Opens the join sheet with the camera already running. */
+  const [scanFirst, setScanFirst] = useState(params.get('scan') === '1');
   const [choosing, setChoosing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -422,6 +466,9 @@ function GroupsInner() {
     [all],
   );
 
+  const owedParts = splitAmount(totals.owed, currency);
+  const oweParts = splitAmount(totals.owe, currency);
+
   async function onDelete() {
     if (!deleting) return;
     try {
@@ -441,19 +488,34 @@ function GroupsInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            <Card tone="butter" className="flex items-end justify-between gap-4">
+            {/* Mint, with both figures in ink. Green on mint is 2.1:1 and red
+                on mint 3.1:1, both under AA — and they were already failing on
+                the yellow this replaced. The captions carry the direction. */}
+            <Card tone="mint" className="flex items-end justify-between gap-4">
               <div className="min-w-0">
                 <p className="newq text-[12px]  uppercase tracking-[0.07em] text-ink-3">
                   Across {groups.length} {groups.length === 1 ? 'circle' : 'circles'}
                 </p>
-                <p className="num mt-1.5 truncate text-[30px]  leading-none text-pos">
-                  {money(totals.owed, currency)}
+                {/* Same hero treatment as the dashboard: the symbol keeps the
+                    UI face, the digits take `small`. Both figures share the
+                    face so the card reads as one thing; only the headline
+                    figure is bold. */}
+                <p className="num mt-1.5 truncate text-[30px] font-bold leading-none text-ink">
+                  <span className="mr-1">{owedParts.symbol}</span>
+                  <span className="small">
+                    {owedParts.whole}
+                    {owedParts.cents && <span className="text-ink-3">{owedParts.cents}</span>}
+                  </span>
                 </p>
                 <p className="newq mt-1.5 text-[12.5px]">owed to you</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="num text-[19px]  text-neg">
-                  {money(totals.owe, currency)}
+                <p className="num text-[19px] text-ink">
+                  <span className="mr-0.5">{oweParts.symbol}</span>
+                  <span className="small">
+                    {oweParts.whole}
+                    {oweParts.cents && <span className="text-ink-3">{oweParts.cents}</span>}
+                  </span>
                 </p>
                 <p className="newq text-[12.5px]">you owe</p>
               </div>
@@ -493,8 +555,25 @@ function GroupsInner() {
                       <Button variant="dark" icon={Plus} onClick={() => setCreating(true)}>
                         New group
                       </Button>
-                      <Button variant="soft" icon={KeyRound} onClick={() => setJoining(true)}>
+                      <Button
+                        variant="soft"
+                        icon={KeyRound}
+                        onClick={() => {
+                          setScanFirst(false);
+                          setJoining(true);
+                        }}
+                      >
                         Join with a code
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        icon={QrCode}
+                        onClick={() => {
+                          setScanFirst(true);
+                          setJoining(true);
+                        }}
+                      >
+                        Scan a QR code
                       </Button>
                     </div>
                   )
@@ -505,7 +584,7 @@ function GroupsInner() {
         ) : (
           <div>
             <GroupLabel>Your circles</GroupLabel>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2.5">
               {rows.map((g, i) => (
                 <motion.div
                   key={g.id}
@@ -556,15 +635,26 @@ function GroupsInner() {
         open={choosing}
         onClose={() => setChoosing(false)}
         onCreate={() => setCreating(true)}
-        onJoin={() => setJoining(true)}
+        onJoin={() => {
+          setScanFirst(false);
+          setJoining(true);
+        }}
+        onScan={() => {
+          setScanFirst(true);
+          setJoining(true);
+        }}
       />
 
       <CreateGroupSheet open={creating} onClose={() => setCreating(false)} />
 
       <JoinGroupSheet
         open={joining}
-        onClose={() => setJoining(false)}
+        onClose={() => {
+          setJoining(false);
+          setScanFirst(false);
+        }}
         initialCode={joinParam === '1' ? '' : joinParam}
+        scanOnOpen={scanFirst}
       />
 
       <EditGroupSheet group={editing} onClose={() => setEditing(null)} />

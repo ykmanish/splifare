@@ -96,18 +96,27 @@ export function Divider({ className = '' }) {
 
 /* ---------------------------------------------------------- badge */
 
+/*
+ * Badge text is 11.5px, so it needs 4.5:1. Every tinted tone used to colour
+ * the text as well as the fill and every one of them missed: brandSoft was
+ * 1.13:1 (lime on pale lime — genuinely invisible), the rest between 2.5 and
+ * 4.2. The tint already tells you which kind of badge it is, so the label is
+ * ink and the hue stays in the background.
+ *
+ * The solid tones are left alone — they were designed as a contrasting pair.
+ */
 const BADGE_TONES = {
   neutral: 'bg-surface-2 text-ink-2',
   dark: 'bg-panel text-white',
   brand: 'bg-brand text-on-brand',
-  brandSoft: 'bg-brand-soft text-brand',
-  butter: 'bg-butter-soft text-warn',
-  mint: 'bg-mint-soft text-pos',
-  pos: 'bg-pos-soft text-pos',
-  neg: 'bg-neg-soft text-neg',
-  warn: 'bg-warn-soft text-warn',
-  info: 'bg-info-soft text-info',
-  violet: 'bg-violet-soft text-violet',
+  brandSoft: 'bg-brand-soft text-ink',
+  butter: 'bg-butter-soft text-ink',
+  mint: 'bg-mint-soft text-ink',
+  pos: 'bg-pos-soft text-ink',
+  neg: 'bg-neg-soft text-ink',
+  warn: 'bg-warn-soft text-ink',
+  info: 'bg-info-soft text-ink',
+  violet: 'bg-violet-soft text-ink',
   onPanel: 'bg-white/14 text-white',
   onTone: 'bg-black/8 text-ink',
 };

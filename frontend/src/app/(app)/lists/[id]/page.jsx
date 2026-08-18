@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import {
   Check,
   ChevronLeft,
+  ChevronRight,
   Play,
   Plus,
   Receipt,
@@ -419,48 +420,64 @@ function ListDetailInner() {
                   const who = sharedIds.map((w) => personById(w));
                   const everyone = sharedIds.length === list.memberIds.length;
 
+                  /*
+                   * Built by hand rather than with FieldRow: the row itself
+                   * opens the item, and FieldRow with an onClick renders a
+                   * <button>, which cannot legally contain the assign button.
+                   */
                   return (
-                    <FieldRow
-                      key={item.id}
-                      label={item.name}
-                      sublabel={`${item.qty} ${item.unit}${item.note ? ` · ${item.note}` : ''}`}
-                      value={Number(item.price) > 0 ? money(item.price, currency) : undefined}
-                      trailing={
-                        <span className="flex shrink-0 items-center gap-1">
-                          <motion.button
-                            type="button"
-                            whileTap={{ scale: 0.97 }}
-                            transition={SPRING}
-                            onClick={() => setAssigning(item)}
-                            aria-label={`Change who ${item.name} is for`}
-                            className="shrink-0 rounded-full p-1 tap hover:bg-surface-2"
-                          >
-                            {everyone ? (
-                              <Badge tone="brandSoft" icon={Users}>
-                                All
-                              </Badge>
-                            ) : who.length === 1 ? (
-                              <Badge tone="neutral">
-                                {who[0]?.id === me.id ? 'You' : firstName(who[0]?.name || '')}
-                              </Badge>
-                            ) : (
-                              <AvatarStack people={who} size="xs" max={3} />
-                            )}
-                          </motion.button>
-
-                          {!completed && (
-                            <RowMenu
-                              title={item.name}
-                              subtitle={`${item.qty} ${item.unit} · ${aisle.label}`}
-                              editLabel="Edit item"
-                              deleteLabel="Remove item"
-                              onEdit={() => openRename(item)}
-                              onDelete={() => setConfirmItem(item)}
-                            />
-                          )}
+                    <div key={item.id} className="flex items-center gap-2 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => openRename(item)}
+                        aria-label={`Open ${item.name}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 py-0.5 text-left tap
+                          active:scale-[0.995]"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="newq text-ink block truncate text-[15px]">
+                            {item.name}
+                          </span>
+                          <span className="newq block truncate text-[12.5px]">
+                            {item.qty} {item.unit}
+                            {item.note ? ` · ${item.note}` : ''}
+                          </span>
                         </span>
-                      }
-                    />
+                        {Number(item.price) > 0 && (
+                          <span className="num shrink-0 text-[15px] font-medium text-ink">
+                            {money(item.price, currency)}
+                          </span>
+                        )}
+                      </button>
+
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.97 }}
+                        transition={SPRING}
+                        onClick={() => setAssigning(item)}
+                        aria-label={`Change who ${item.name} is for`}
+                        className="shrink-0 rounded-full p-1 tap hover:bg-surface-2"
+                      >
+                        {everyone ? (
+                          <Badge tone="brandSoft" icon={Users}>
+                            All
+                          </Badge>
+                        ) : who.length === 1 ? (
+                          <Badge tone="neutral">
+                            {who[0]?.id === me.id ? 'You' : firstName(who[0]?.name || '')}
+                          </Badge>
+                        ) : (
+                          <AvatarStack people={who} size="xs" max={3} />
+                        )}
+                      </motion.button>
+
+                      <ChevronRight
+                        size={17}
+                        strokeWidth={2.2}
+                        className="shrink-0 text-ink-3"
+                        aria-hidden
+                      />
+                    </div>
                   );
                 })}
               </ListGroup>
@@ -490,6 +507,14 @@ function ListDetailInner() {
           onClose={() => setRenameOpen(false)}
           item={renaming.item}
           onSave={onSaveItem}
+          onDelete={
+            completed
+              ? undefined
+              : () => {
+                  setRenameOpen(false);
+                  setConfirmItem(renaming.item);
+                }
+          }
         />
       )}
 
@@ -543,7 +568,7 @@ export default function ListDetailPage() {
 /* ------------------------------------------------------------------ */
 
 /** Inline item edit — rename, retune the quantity, move it to another aisle. */
-function ItemEditSheet({ open, onClose, item, onSave }) {
+function ItemEditSheet({ open, onClose, item, onSave, onDelete }) {
   // Remounted with a fresh `key` every time an item is picked, so the draft
   // always starts from that item — no reset effect needed.
   const [name, setName] = useState(item?.name || '');
@@ -560,8 +585,8 @@ function ItemEditSheet({ open, onClose, item, onSave }) {
     <Sheet
       open={open}
       onClose={onClose}
-      title="Edit item"
-      subtitle={item.name}
+      title={item.name}
+      subtitle={`${item.qty} ${item.unit}`}
       size="sm"
       footer={
         <div className="flex gap-2.5">
@@ -625,6 +650,24 @@ function ItemEditSheet({ open, onClose, item, onSave }) {
           onChange={(e) => setNote(e.target.value)}
           placeholder="Ripe ones, not the green"
         />
+
+        {/* Removal lives here now that the row opens this sheet — it replaces
+            the per-row ⋯ menu, so a delete is never one stray tap away. */}
+        {onDelete && (
+          <div>
+            <GroupLabel>Remove</GroupLabel>
+            <Card tone="blushSoft" pad={false}>
+              <FieldRow
+                icon={Trash2}
+                iconBg="var(--blush)"
+                label="Remove from the list"
+                sublabel="Comes off for everybody sharing it"
+                danger
+                onClick={onDelete}
+              />
+            </Card>
+          </div>
+        )}
       </div>
     </Sheet>
   );

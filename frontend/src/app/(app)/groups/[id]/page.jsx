@@ -49,7 +49,7 @@ import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor, netByMember, simplify, shareOf } from '@/lib/balances';
-import { money, firstName, dayLabel } from '@/lib/format';
+import { money, firstName, dayLabel, splitAmount } from '@/lib/format';
 import { categoryOf, GROUP_EMOJIS } from '@/lib/categories';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -225,7 +225,7 @@ export default function GroupDetailPage() {
   const groupLists = lists.filter((l) => l.groupId === group.id);
   const { mine, nets, transfers, groupExpenses, total } = data;
   const settled = Math.abs(mine.net) < 0.005;
-  const netTone = mine.net > 0.005 ? 'text-pos' : mine.net < -0.005 ? 'text-neg' : 'text-ink';
+  const netParts = splitAmount(mine.net, currency);
 
   const byDay = groupExpenses.reduce((acc, e) => {
     const key = dayLabel(e.date);
@@ -385,8 +385,16 @@ export default function GroupDetailPage() {
               <p className="newq  text-ink mt-4 text-center text-[19px] leading-tight">{group.name}</p>
 
               <p className="newq text-[12px] font-bold small uppercase tracking-[0.07em] text-ink-3 mt-4">Your balance here</p>
-              <p className={`num mt-1.5 text-[38px]  leading-none ${netTone}`}>
-                {money(Math.abs(mine.net), currency)}
+              {/* Same hero treatment as the other two: symbol in the UI face,
+                  digits in `small`, bold. Ink rather than pos/neg — green on
+                  this lavender is 1.9:1, and the caption underneath already
+                  says which way the balance runs. */}
+              <p className="num mt-1.5 text-[38px] font-bold leading-none text-ink">
+                <span className="mr-1">{netParts.symbol}</span>
+                <span className="small">
+                  {netParts.whole}
+                  {netParts.cents && <span className="text-ink-3">{netParts.cents}</span>}
+                </span>
               </p>
 
               {settled ? (

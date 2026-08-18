@@ -160,8 +160,8 @@ export function AmountInput({
             autoFocus={autoFocus}
             aria-label="Amount"
             size={1}
-            className="num min-w-[1.5ch] border-none bg-transparent text-center !text-[56px] font-medium
-               leading-none text-ink outline-none placeholder:text-ink-3/45"
+            className="num small min-w-[1.5ch] border-none bg-transparent text-center !text-[56px]
+               font-bold leading-none text-ink outline-none placeholder:text-ink-3/45"
             style={{ width: `${Math.max(String(value || '0').length, 1)}ch`, fontSize: '56px' }}
           />
         </div>
@@ -177,7 +177,7 @@ export function AmountInput({
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => set(String(n + q))}
-              className="num rounded-[12px] bg-surface-2 py-2.5 text-[13.5px] font-medium
+              className="newq rounded-[12px] bg-surface-2 py-2.5 text-[13.5px] font-medium
                 text-ink tap hover:bg-surface-3"
             >
               +{money(q, currency)}

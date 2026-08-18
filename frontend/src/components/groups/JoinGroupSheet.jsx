@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowRight, Check, Users } from 'lucide-react';
+import { ArrowRight, Check, QrCode, Users } from 'lucide-react';
 import Sheet from '@/components/ui/Sheet';
 import Button from '@/components/ui/Button';
 import { CodeInput } from '@/components/ui/CodeBox';
 import { Card } from '@/components/ui/Bits';
 import { GroupLabel, SheetHeader, StatusPill } from '@/components/ui/Blocks';
+import QrScanner from '@/components/ui/QrScanner';
+import { parseInviteCode } from '@/lib/invite';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 
@@ -19,7 +21,13 @@ const CODE_LENGTH = 6;
  * step is what stops a mistyped code from silently dropping someone into a
  * stranger's group.
  */
-export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = '' }) {
+export default function JoinGroupSheet({
+  open,
+  onClose,
+  onJoined,
+  initialCode = '',
+  scanOnOpen = false,
+}) {
   const { previewGroup, joinGroup } = useApp();
   const { toast } = useToast();
   const router = useRouter();
@@ -27,6 +35,7 @@ export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = 
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState('');
+  const [scanning, setScanning] = useState(false);
 
   /**
    * The last lookup, tagged with the code it was for. Reading it back through
@@ -46,6 +55,8 @@ export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = 
       setCode(seed);
       setBusy(false);
       setFailed('');
+      // A code already in hand beats opening the camera on top of it.
+      setScanning(scanOnOpen && seed.length < CODE_LENGTH);
       setLookup({ code: '', group: null, error: '', looking: false });
       // A scanned code arrives complete, so look it up straight away instead
       // of waiting for a keystroke that will never come. Deferred by a
@@ -76,6 +87,30 @@ export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = 
     setFailed('');
     setCode(next);
   }
+
+  /**
+   * A scan gives us a whole invite URL. Pull the code out, drop it into the
+   * slots and look it up, so the camera closing lands the reader straight on
+   * the confirm step.
+   */
+  const onScan = useCallback(
+    (text) => {
+      const hit = parseInviteCode(text);
+      if (!hit) {
+        setFailed('That QR is not a Splitta invite');
+        setScanning(false);
+        return;
+      }
+      const scanned = hit.code.slice(0, CODE_LENGTH);
+      setScanning(false);
+      setFailed('');
+      setCode(scanned);
+      if (scanned.length === CODE_LENGTH) lookUp(scanned);
+    },
+    // lookUp is a stable function declaration in this component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   async function submit() {
     if (busy || code.length < CODE_LENGTH) return;
@@ -130,22 +165,50 @@ export default function JoinGroupSheet({ open, onClose, onJoined, initialCode = 
           subtitle="Ask a member for the room code"
         />
 
-        <div>
-          <GroupLabel>Room code</GroupLabel>
-          <CodeInput
-            value={code}
-            onChange={onCodeChange}
-            onComplete={lookUp}
-            length={CODE_LENGTH}
-            error={error}
-            autoFocus
-          />
-          {!error && (
-            <p className="newq mt-2.5 px-1.5 text-center text-[12px]">
-              {looking ? 'Looking it up…' : `${CODE_LENGTH} letters and numbers`}
-            </p>
-          )}
-        </div>
+        {scanning ? (
+          <div>
+            <GroupLabel>Scan a room code</GroupLabel>
+            <QrScanner
+              active={scanning}
+              onResult={onScan}
+              onCancel={() => setScanning(false)}
+            />
+          </div>
+        ) : (
+          <div>
+            <GroupLabel
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFailed('');
+                    setScanning(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5
+                    py-1.5 newq text-[12px] text-ink tap active:scale-95 hover:bg-surface-3"
+                >
+                  <QrCode size={13} strokeWidth={2.3} />
+                  Scan
+                </button>
+              }
+            >
+              Room code
+            </GroupLabel>
+            <CodeInput
+              value={code}
+              onChange={onCodeChange}
+              onComplete={lookUp}
+              length={CODE_LENGTH}
+              error={error}
+              autoFocus={!scanOnOpen}
+            />
+            {!error && (
+              <p className="newq mt-2.5 px-1.5 text-center text-[12px]">
+                {looking ? 'Looking it up…' : `${CODE_LENGTH} letters and numbers`}
+              </p>
+            )}
+          </div>
+        )}
 
         {found && (
           <motion.div

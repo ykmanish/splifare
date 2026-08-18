@@ -31,7 +31,7 @@ import { Pills } from '@/components/ui/Controls';
 import { ConfirmSheet } from '@/components/ui/Sheet';
 import { useToast } from '@/components/ui/Toast';
 import { categoryOf } from '@/lib/categories';
-import { money, firstName, CURRENCIES } from '@/lib/format';
+import { money, firstName, splitAmount, CURRENCIES } from '@/lib/format';
 import { isInvolved, shareOf } from '@/lib/balances';
 import FxNote from '@/components/ui/FxNote';
 
@@ -149,12 +149,12 @@ export default function DashboardPage() {
   const peak = Math.max(monthTotal, overview.owed, overview.owe, 1);
   const pctOf = (v) => (v / peak) * 100;
 
-  /* The hero splits the figure so the decimals can recede — a big number
-     reads faster when the part that rarely matters is quieter. */
-  const heroAmount = money(Math.abs(overview.net), currency);
-  const heroSplit = heroAmount.match(/^(.*?)([.,]\d{2})$/);
-  const heroWhole = heroSplit ? heroSplit[1] : heroAmount;
-  const heroCents = heroSplit ? heroSplit[2] : '';
+  /* Symbol in the UI face, digits in the display face, decimals quieter — a
+     big number reads faster when the part that rarely matters recedes. */
+  const { symbol: heroSymbol, whole: heroWhole, cents: heroCents } = splitAmount(
+    overview.net,
+    currency,
+  );
 
   const tiles = [
     { id: 'add', label: 'Add', icon: Plus, tone: 'dark', onClick: () => openExpense() },
@@ -173,9 +173,18 @@ export default function DashboardPage() {
               {settledNet ? 'All settled' : overview.net > 0 ? 'You are owed' : 'You owe'}
             </p>
 
-            <p className="num mt-2 text-[44px] leading-none text-ink">
-              {heroWhole}
-              {heroCents && <span className="text-ink-3">{heroCents}</span>}
+            {/* `small` is scoped to the digits only — the currency symbol stays
+                in the UI face. `num` stays on the wrapper for its tabular
+                figures, so the digits keep their positions as the balance
+                changes. */}
+            <p className="num mt-2 text-[44px] font-bold leading-none text-ink">
+              {/* A margin, not a literal space: JSX would collapse the space and
+                  a real one is not tunable at this size. */}
+              <span className="mr-1.5">{heroSymbol}</span>
+              <span className="small">
+                {heroWhole}
+                {heroCents && <span className="text-ink-3">{heroCents}</span>}
+              </span>
             </p>
 
             <p className="newq mt-2.5 text-[12.5px]">{headline}</p>

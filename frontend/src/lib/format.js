@@ -42,6 +42,24 @@ export function plain(amount) {
 
 export const symbolOf = (code) => (CURRENCIES[code] || CURRENCIES.INR).symbol;
 
+/**
+ * Take a formatted amount apart so a hero can style its pieces differently:
+ * the symbol stays in the UI face, the digits can take the display face, and
+ * the decimals can recede.
+ *
+ * The symbol is peeled off with `symbolOf` rather than a regex, so this holds
+ * for every currency in CURRENCIES (all of them lead with their symbol, and
+ * none collides with digit grouping). `money` remains the only place the
+ * number itself is formatted.
+ */
+export function splitAmount(amount, currency = 'INR') {
+  const symbol = symbolOf(currency);
+  const text = money(Math.abs(Number(amount) || 0), currency);
+  const digits = text.startsWith(symbol) ? text.slice(symbol.length) : text;
+  const m = digits.match(/^(.*?)([.,]\d{2})$/);
+  return { symbol, whole: m ? m[1] : digits, cents: m ? m[2] : '' };
+}
+
 /* ---------------------------------------------------------------- dates */
 
 const DAY = 86400000;

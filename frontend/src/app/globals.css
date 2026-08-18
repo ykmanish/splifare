@@ -335,9 +335,13 @@ body {
     letter-spacing: -0.008em;
   }
 
-  /* Money & any aligned numerals — same face, tabular figures */
+  /* Money & any aligned numerals.
+     Same face as .newq — every figure in the app reads as one family — plus
+     tabular figures, which .newq does not give: without them a balance jumps
+     sideways as its digits change. Kept here in the components layer so a
+     utility or .small can still override the face per element. */
   .num {
-    font-family: var(--font-sans);
+    font-family: "Geist";
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1, 'lnum' 1;
     letter-spacing: -0.024em;

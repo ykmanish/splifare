@@ -85,7 +85,9 @@ export function FieldRow({
         {sublabel && <span className="newq block truncate text-[12.5px]">{sublabel}</span>}
       </span>
 
-      {value && <span className="num shrink-0 text-[15px] font-medium text-ink">{value}</span>}
+      {value && (
+        <span className="num shrink-0 text-[15px] font-medium text-ink">{value}</span>
+      )}
       {trailing}
       {plus && <Plus size={18} strokeWidth={2.2} className="shrink-0 text-ink-3" />}
       {chevron && <ChevronRight size={18} strokeWidth={2.2} className="shrink-0 text-ink-3" />}
@@ -274,21 +276,28 @@ export function PersonRow({ person, name, sublabel, trailing, onClick, href, cla
    STATUS PILL — full-width grey status strip
    ================================================================ */
 
+/**
+ * Full-width status strip.
+ *
+ * The label is always ink and the tone rides on the icon instead. Colouring
+ * the text left `blue` at 1.14:1 (lime on pale blue — invisible), and `pos`
+ * and `neg` at 2.1:1 and 3.0:1, all well under WCAG AA. Ink on these fills
+ * is above 14:1, and a tinted icon carries the meaning perfectly well.
+ */
 export function StatusPill({ children, tone = 'neutral', icon: Icon, className = '' }) {
   const t = {
-    neutral: 'bg-surface-2 text-ink-2',
-    pos: 'bg-mint text-pos',
-    neg: 'bg-blush text-neg',
-    blue: 'bg-sky text-brand',
-  }[tone];
+    neutral: { bg: 'bg-surface-2', icon: 'text-ink-3' },
+    pos: { bg: 'bg-mint', icon: 'text-pos' },
+    neg: { bg: 'bg-blush', icon: 'text-neg' },
+    blue: { bg: 'bg-sky', icon: 'text-info' },
+  }[tone] || { bg: 'bg-surface-2', icon: 'text-ink-3' };
+
   return (
     <div
-      className={`flex items-center justify-center gap-2 rounded-[16px] px-4 py-3.5 ${t} ${className}`}
+      className={`flex items-center justify-center gap-2 rounded-[16px] px-4 py-3.5 ${t.bg} ${className}`}
     >
-      {Icon && <Icon size={16} strokeWidth={2.2} />}
-      <span className="newq  text-ink text-[13.5px]" style={{ color: 'inherit' }}>
-        {children}
-      </span>
+      {Icon && <Icon size={16} strokeWidth={2.2} className={`shrink-0 ${t.icon}`} />}
+      <span className="newq text-[13.5px] text-ink">{children}</span>
     </div>
   );
 }
