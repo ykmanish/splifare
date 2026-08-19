@@ -5,6 +5,7 @@ import BottomNav from './BottomNav';
 import NotificationPanel from './NotificationPanel';
 import AddExpenseSheet from '@/components/expense/AddExpenseSheet';
 import SettleUpSheet from '@/components/groups/SettleUpSheet';
+import UpdateSheet from '@/components/ui/UpdateSheet';
 
 const UICtx = createContext(null);
 
@@ -22,6 +23,7 @@ export default function AppShell({ children }) {
   const [expense, setExpense] = useState(null);
   const [settle, setSettle] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
 
   const value = useMemo(
     () => ({
@@ -36,6 +38,7 @@ export default function AppShell({ children }) {
       editExpense: (e) => setExpense({ editing: e, mode: 'edit' }),
       openSettle: (prefill = {}) => setSettle(prefill),
       openNotifications: () => setNotifOpen(true),
+      openUpdate: () => setUpdateOpen(true),
     }),
     [],
   );
@@ -53,6 +56,8 @@ export default function AppShell({ children }) {
       </div>
 
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+
+      <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} />
 
       <AddExpenseSheet
         open={!!expense}

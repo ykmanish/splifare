@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { User } = require('./models');
+const { BUILD } = require('./utils/build');
 
 /**
  * Realtime push over websockets.
@@ -74,8 +75,13 @@ function initRealtime(httpServer, { allowedOrigins }) {
   io.on('connection', (socket) => {
     socket.join(room(socket.userId));
 
-    // Lets the client tell "connected" from "connected and authenticated".
-    socket.emit('ready', { userId: socket.userId });
+    /*
+     * Lets the client tell "connected" from "connected and authenticated",
+     * and carries the build it is talking to. A deploy restarts the server,
+     * every socket reconnects, and the build in this payload is how a client
+     * finds out its own copy of the app is now behind — no polling.
+     */
+    socket.emit('ready', { userId: socket.userId, build: BUILD });
 
     socket.on('disconnect', () => {
       /* rooms are cleaned up by socket.io */

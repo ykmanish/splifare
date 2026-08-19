@@ -124,6 +124,29 @@ export function AppProvider({ children }) {
   /** True while a websocket is connected and authenticated. */
   const [live, setLive] = useState(false);
 
+  /*
+   * The build this tab loaded against, and whether the server has since moved
+   * to a different one. `bootBuild` is a ref rather than state on purpose: it
+   * is written once, from whichever signal arrives first, and re-rendering on
+   * it would be noise.
+   */
+  const bootBuild = useRef(null);
+  const [updateReady, setUpdateReady] = useState(false);
+
+  /**
+   * Compare a build the server just reported against the one this tab is
+   * running. The first one seen becomes the baseline; anything different
+   * afterwards means something was deployed under us.
+   */
+  const noteBuild = useCallback((build) => {
+    if (!build) return;
+    if (bootBuild.current === null) {
+      bootBuild.current = build;
+      return;
+    }
+    if (build !== bootBuild.current) setUpdateReady(true);
+  }, []);
+
   const patchData = useCallback((patch) => setData((d) => ({ ...d, ...patch })), []);
 
   /* ---------------------------------------------------- loading */
@@ -272,7 +295,10 @@ export function AppProvider({ children }) {
     const sock = connectSocket();
     if (!sock) return undefined;
 
-    const onReady = () => setLive(true);
+    const onReady = (payload) => {
+      setLive(true);
+      noteBuild(payload?.build);
+    };
     const onDisconnect = () => setLive(false);
 
     const onSync = (payload) => {
@@ -291,7 +317,8 @@ export function AppProvider({ children }) {
     };
 
     sock.on('ready', onReady);
-    sock.on('connect', onReady);
+    // `connect` carries no payload — it only means the transport is up.
+    sock.on('connect', () => setLive(true));
     sock.on('disconnect', onDisconnect);
     sock.on('connect_error', onDisconnect);
     sock.on('sync', onSync);
@@ -307,7 +334,7 @@ export function AppProvider({ children }) {
       disconnectSocket();
       setLive(false);
     };
-  }, [ready, me, refresh]);
+  }, [ready, me, refresh, noteBuild]);
 
   /* ---------------------------------------------------- push */
 
@@ -371,8 +398,14 @@ export function AppProvider({ children }) {
       try {
         // Friend requests ride along with the poll so an invite lands on the
         // friends screen without the recipient reloading anything.
-        const [r, reqs] = await Promise.all([api.notifications(), api.friendRequests()]);
+        const [r, reqs, ver] = await Promise.all([
+          api.notifications(),
+          api.friendRequests(),
+          // Cheap, and the only signal a client gets when no websocket came up.
+          api.version().catch(() => null),
+        ]);
         if (stopped) return;
+        noteBuild(ver?.build);
         const next = r.notifications.map(normNotification);
         const incoming = reqs.incoming.map(normFriendRequest);
         const outgoing = reqs.outgoing.map(normFriendRequest);
@@ -409,7 +442,7 @@ export function AppProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [ready, me, pushLive, live]);
+  }, [ready, me, pushLive, live, noteBuild]);
 
   /* ---------------------------------------------------- theme */
 
@@ -834,6 +867,8 @@ export function AppProvider({ children }) {
       ledger,
       overview,
       unreadCount,
+      /** A different build is live on the server than this tab is running. */
+      updateReady,
       personById,
       ...actions,
     }),
@@ -853,6 +888,7 @@ export function AppProvider({ children }) {
       ledger,
       overview,
       unreadCount,
+      updateReady,
       personById,
       actions,
     ],

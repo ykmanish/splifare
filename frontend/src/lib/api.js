@@ -236,6 +236,9 @@ export const api = {
   deleteAccount: (body) => request('/auth/me', { method: 'DELETE', body }),
   changePassword: (body) => post('/auth/password', body),
 
+  /** The build the server is running. Public — it is only an id. */
+  version: () => get('/version', { auth: false }),
+
   /* receipt scanning */
   scanStatus: () => get('/scan/status'),
   scanReceipt: (body) => post('/scan/receipt', body),

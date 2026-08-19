@@ -70,6 +70,15 @@
   --sky-soft: #e5eefd;
   --grape: #d9cff8;
   --grape-soft: #ebe6fc;
+
+  /* The home hero. Its own pair rather than a Card tone, because the card is
+     a light block in BOTH themes — so its text colour must not flip with the
+     theme the way --text does, or the figures vanish in dark mode. */
+  --hero-card: #d9cff8;
+  --on-hero-card: #0b0c0d;
+  --on-hero-card-2: #4e5661;
+  --on-hero-pos: #0a7f55;
+  --on-hero-neg: #c2222f;
   --peach: #fad5b7;
   --peach-soft: #fdeadb;
 
@@ -150,6 +159,14 @@
   --sky-soft: rgba(95, 157, 255, 0.15);
   --grape: rgba(154, 140, 255, 0.26);
   --grape-soft: rgba(154, 140, 255, 0.16);
+
+  /* Deliberately light in dark mode — a pale block against the near-black
+     canvas, with its own dark ink so nothing on it inherits the light text. */
+  --hero-card: #dbe8fb;
+  --on-hero-card: #0b0c0d;
+  --on-hero-card-2: #4e5661;
+  --on-hero-pos: #0a7f55;
+  --on-hero-neg: #c2222f;
   --peach: rgba(250, 160, 95, 0.26);
   --peach-soft: rgba(250, 160, 95, 0.16);
 
@@ -227,6 +244,11 @@
   --color-blush-soft: var(--blush-soft);
   --color-sky: var(--sky);
   --color-sky-soft: var(--sky-soft);
+  --color-on-hero-pos: var(--on-hero-pos);
+  --color-on-hero-neg: var(--on-hero-neg);
+  --color-hero-card: var(--hero-card);
+  --color-on-hero-card: var(--on-hero-card);
+  --color-on-hero-card-2: var(--on-hero-card-2);
   --color-grape: var(--grape);
   --color-grape-soft: var(--grape-soft);
   --color-peach: var(--peach);
@@ -289,6 +311,16 @@ html {
   background: var(--canvas);
   overscroll-behavior: none;
   scroll-behavior: smooth;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+/* Hide scrollbar for IE, Edge, and Firefox */
+html {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 body {

@@ -24,6 +24,9 @@ const TONES = {
   /* Lime — use sparingly, for the one accent surface */
   lime: 'bg-brand text-on-brand',
   limeSoft: 'bg-brand-soft text-ink',
+  /* The home hero. Light in BOTH themes, so it carries its own ink rather
+     than the theme's — `text-ink` here would be near-white in dark mode. */
+  hero: 'bg-hero-card text-on-hero-card',
   /* The six pastel colour-blocks, at full strength */
   mint: 'bg-mint text-ink',
   mintSoft: 'bg-mint-soft text-ink',

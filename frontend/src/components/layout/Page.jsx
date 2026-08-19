@@ -20,7 +20,7 @@ export default function Page({
   hero,
   children,
 }) {
-  const { openNotifications } = useUI();
+  const { openNotifications, openUpdate } = useUI();
 
   return (
     <>
@@ -30,6 +30,7 @@ export default function Page({
         back={back}
         right={actions}
         onOpenNotifications={openNotifications}
+        onOpenUpdate={openUpdate}
       />
 
       {hero}

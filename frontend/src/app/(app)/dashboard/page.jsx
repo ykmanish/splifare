@@ -172,8 +172,14 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* --------------------------------------------- hero */}
         <Section delay={0.04}>
-          <Card tone="grape" pad={false} className="px-5 pb-5 pt-6">
-            <p className="newq text-[11.5px] uppercase tracking-[0.09em] text-ink-3 dark:text-ink-2">
+          {/*
+            Its own colour pair rather than a Card tone: this block stays a
+            light pastel in dark mode too, so every colour on it has to be
+            fixed. `text-ink` here would be near-white in dark mode — the
+            balance would disappear into the card.
+          */}
+          <Card tone="hero" pad={false} className="px-5 pb-5 pt-6">
+            <p className="newq text-[11.5px] uppercase tracking-[0.09em] text-on-hero-card-2">
               {settledNet ? 'All settled' : overview.net > 0 ? 'You are owed' : 'You owe'}
             </p>
 
@@ -181,36 +187,37 @@ export default function DashboardPage() {
                 in the UI face. `num` stays on the wrapper for its tabular
                 figures, so the digits keep their positions as the balance
                 changes. */}
-            <p className="num mt-2 text-[44px] font-bold leading-none text-ink">
+            <p className="num mt-2 text-[44px] font-bold leading-none text-on-hero-card">
               {/* A margin, not a literal space: JSX would collapse the space and
                   a real one is not tunable at this size. */}
               <span className="mr-1.5">{heroSymbol}</span>
               <span className="small">
                 {heroWhole}
-                {heroCents && <span className="text-ink-3 dark:text-ink-2">{heroCents}</span>}
+                {heroCents && <span className="text-on-hero-card-2">{heroCents}</span>}
               </span>
             </p>
 
-            <p className="newq mt-2.5 text-[12.5px]">{headline}</p>
+            <p className="newq mt-2.5 text-[12.5px] text-on-hero-card-2">{headline}</p>
 
             {/* Two white discs on the pastel, the way the reference splits a
-                balance into its two directions. */}
+                balance into its two directions. White in both themes, since
+                the card behind them is light in both. */}
             <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <div className="rounded-[18px] bg-white/70 dark:bg-white/10 px-4 py-3">
+              <div className="rounded-[18px] bg-white/70 px-4 py-3">
                 <span className="flex items-center gap-1.5">
-                  <ArrowDownLeft size={13} strokeWidth={2.5} className="text-pos" />
-                  <span className="newq text-[11.5px]">Owed to you</span>
+                  <ArrowDownLeft size={13} strokeWidth={2.5} className="text-on-hero-pos" />
+                  <span className="newq text-[11.5px] text-on-hero-card-2">Owed to you</span>
                 </span>
-                <p className="num mt-1 truncate text-[18px] text-ink">
+                <p className="num mt-1 truncate text-[18px] text-on-hero-card">
                   {money(overview.owed, currency)}
                 </p>
               </div>
-              <div className="rounded-[18px] bg-white/70 dark:bg-white/10 px-4 py-3">
+              <div className="rounded-[18px] bg-white/70 px-4 py-3">
                 <span className="flex items-center gap-1.5">
-                  <ArrowUpRight size={13} strokeWidth={2.5} className="text-neg" />
-                  <span className="newq text-[11.5px]">You owe</span>
+                  <ArrowUpRight size={13} strokeWidth={2.5} className="text-on-hero-neg" />
+                  <span className="newq text-[11.5px] text-on-hero-card-2">You owe</span>
                 </span>
-                <p className="num mt-1 truncate text-[18px] text-ink">
+                <p className="num mt-1 truncate text-[18px] text-on-hero-card">
                   {money(overview.owe, currency)}
                 </p>
               </div>

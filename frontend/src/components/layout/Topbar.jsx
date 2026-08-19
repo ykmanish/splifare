@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Bell, ChevronLeft, RefreshCw } from 'lucide-react';
+import { ArrowDownToLine, Bell, ChevronLeft, RefreshCw } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { IconCircle } from '@/components/ui/Blocks';
 import { useApp } from '@/store/AppContext';
@@ -30,8 +30,15 @@ function greeting() {
  * Sticky, never transformed — BottomNav is position:fixed inside the same
  * phone column and a transformed ancestor would collapse it.
  */
-export default function Topbar({ title, subtitle, back, right, onOpenNotifications }) {
-  const { me, unreadCount, reload, syncing } = useApp();
+export default function Topbar({
+  title,
+  subtitle,
+  back,
+  right,
+  onOpenNotifications,
+  onOpenUpdate,
+}) {
+  const { me, unreadCount, reload, syncing, updateReady } = useApp();
   const router = useRouter();
 
   const goBack = () => (typeof back === 'string' ? router.push(back) : router.back());
@@ -70,6 +77,32 @@ export default function Topbar({ title, subtitle, back, right, onOpenNotificatio
         {/* ---------------------------------------------- right cluster */}
         <div className="flex shrink-0 items-center gap-2 justify-self-end">
           {right}
+
+          {/*
+            Only here when the server is genuinely running a different build,
+            and gone again the moment this tab is on it. A permanent "update"
+            affordance teaches people to ignore it.
+          */}
+          {updateReady && (
+            <motion.button
+              type="button"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 15, stiffness: 480 }}
+              onClick={onOpenUpdate}
+              aria-label="A new version is ready — tap to update"
+              className="relative grid size-10 shrink-0 place-items-center rounded-full
+                bg-brand text-on-brand tap hover:brightness-105 active:scale-90"
+            >
+              <ArrowDownToLine size={18} strokeWidth={2.4} />
+              <motion.span
+                aria-hidden="true"
+                animate={{ opacity: [0.55, 0, 0.55] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-brand"
+              />
+            </motion.button>
+          )}
 
           <button
             type="button"

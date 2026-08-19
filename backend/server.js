@@ -18,6 +18,8 @@ const feedRoutes = require('./src/routes/feed');
 const rateRoutes = require('./src/routes/rates');
 const pushRoutes = require('./src/routes/push');
 const scanRoutes = require('./src/routes/scan');
+const { BUILD, STARTED_AT } = require('./src/utils/build');
+const { CHANGELOG, LATEST } = require('./src/changelog');
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
@@ -62,6 +64,22 @@ app.use(
  */
 app.use('/api/scan', express.json({ limit: '6mb' }));
 app.use(express.json({ limit: '1mb' }));
+
+/*
+ * The running build, for a client that wants to check without a socket — the
+ * slow poll uses it as a safety net when a websocket cannot be established.
+ */
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  // The notes ride along: the update screen wants them the moment it finishes,
+  // and one round trip is one fewer thing to fail at that point.
+  res.json({ build: BUILD, startedAt: STARTED_AT, notes: LATEST });
+});
+
+/** Every release, for a full history rather than just the newest. */
+app.get('/api/changelog', (req, res) => {
+  res.json({ releases: CHANGELOG });
+});
 
 app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');
