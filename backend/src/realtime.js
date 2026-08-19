@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const { User } = require('./models');
 
 /**
  * Realtime push over websockets.
@@ -39,20 +40,35 @@ function initRealtime(httpServer, { allowedOrigins }) {
    * unauthenticated socket is refused rather than allowed to sit idle, so
    * there is no window in which a client is connected but roomless.
    */
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token =
       socket.handshake.auth?.token ||
       (socket.handshake.headers.authorization || '').replace(/^Bearer /, '');
 
     if (!token) return next(new Error('Not signed in'));
 
+    let payload;
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = String(payload.sub);
-      return next();
+      payload = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       return next(new Error('Invalid session'));
     }
+
+    /*
+     * The token alone is not enough. The client reconnects with backoff, so
+     * a closed account whose socket was dropped would simply come back and
+     * sit in its room for the token's remaining life — receiving other
+     * people's notifications. Check the row, not just the signature.
+     */
+    try {
+      const user = await User.findById(payload.sub).select('deletedAt');
+      if (!user || user.deletedAt) return next(new Error('Invalid session'));
+    } catch {
+      return next(new Error('Invalid session'));
+    }
+
+    socket.userId = String(payload.sub);
+    return next();
   });
 
   io.on('connection', (socket) => {
@@ -106,6 +122,23 @@ function emitNotification(userIds, notification) {
   }
 }
 
+/**
+ * Drop every socket a user currently holds. Used when an account closes:
+ * without it the client keeps a live, authenticated connection to a room
+ * that should no longer exist.
+ */
+async function disconnectUser(userId) {
+  if (!io) return 0;
+  try {
+    const sockets = await io.in(room(userId)).fetchSockets();
+    sockets.forEach((s) => s.disconnect(true));
+    return sockets.length;
+  } catch (err) {
+    console.error('[realtime] disconnectUser failed:', err.message);
+    return 0;
+  }
+}
+
 /** How many sockets a user currently has open, for diagnostics. */
 async function socketCount(userId) {
   if (!io) return 0;
@@ -113,4 +146,4 @@ async function socketCount(userId) {
   return sockets.length;
 }
 
-module.exports = { initRealtime, emitSync, emitNotification, socketCount };
+module.exports = { initRealtime, emitSync, emitNotification, disconnectUser, socketCount };

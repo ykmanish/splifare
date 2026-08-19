@@ -7,6 +7,8 @@ import {
   AtSign,
   User,
   Mail,
+  KeyRound,
+  Lock,
   Phone,
   Sun,
   Moon,
@@ -34,12 +36,14 @@ import { AVATAR_OPTIONS } from '@/components/ui/Avatar';
 import { ActionTiles, FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import { Badge, Switch } from '@/components/ui/Bits';
 import { useApp } from '@/store/AppContext';
-import { pushReason } from '@/lib/push';
+import { disablePush, pushReason } from '@/lib/push';
 import { haptics, hapticsEnabled, hapticsSupported, setHapticsEnabled } from '@/lib/haptics';
 import { isValidUpiId } from '@/lib/upi';
 import { handleOf, normalizeUsername, usernameError } from '@/lib/username';
 import { useToast } from '@/components/ui/Toast';
-import { CURRENCIES } from '@/lib/format';
+import { CURRENCIES, money } from '@/lib/format';
+import { clearExpenseDraft } from '@/lib/draft';
+import StatusSheet from '@/components/ui/StatusSheet';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -82,6 +86,8 @@ function GroupNote({ icon: Icon, children }) {
 export default function SettingsPage() {
   const {
     me,
+    overview,
+    deleteAccount,
     prefs,
     setPrefs,
     setTheme,
@@ -117,6 +123,15 @@ export default function SettingsPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
+
+  /* Closing the account gets its own sheet rather than a ConfirmSheet: it
+     needs two inputs, a loading state, and a success state that has to be
+     shown before the session is torn down. */
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closePassword, setClosePassword] = useState('');
+  const [closeConfirm, setCloseConfirm] = useState('');
+  const [closing, setClosing] = useState(false);
+  const [closeStatus, setCloseStatus] = useState(null);
 
   const [pushBusy, setPushBusy] = useState(false);
   /* Read once on mount rather than every render: localStorage is synchronous
@@ -273,6 +288,49 @@ export default function SettingsPage() {
   }
 
   function signOut() {
+    logout();
+    router.replace('/login');
+  }
+
+  function openCloseAccount() {
+    setClosePassword('');
+    setCloseConfirm('');
+    setCloseOpen(true);
+  }
+
+  async function closeAccount() {
+    if (closing) return;
+    setClosing(true);
+    try {
+      /*
+       * Unsubscribe first, while the token still authenticates. The server
+       * deletes its own record of the subscription, but only this browser can
+       * release the one the push service holds — and a moment from now this
+       * account can no longer authenticate to ask.
+       */
+      await disablePush().catch(() => {});
+      await deleteAccount({ password: closePassword, confirm: closeConfirm });
+      /*
+       * Shown before the session is torn down. The instant `me` goes null the
+       * app layout swaps this whole page for the login redirect, so anything
+       * rendered after `logout()` is never seen.
+       */
+      setCloseOpen(false);
+      setCloseStatus('success');
+    } catch (err) {
+      toast({
+        tone: 'error',
+        title: 'Could not close your account',
+        description: err.message,
+      });
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  function finishClose() {
+    setCloseStatus(null);
+    clearExpenseDraft();
     logout();
     router.replace('/login');
   }
@@ -438,7 +496,23 @@ export default function SettingsPage() {
           </ListGroup>
         </Section>
 
-        <p className="newq pb-2 text-center text-[12px]">Splitta · front-end demo build</p>
+        {/* ---------------------------------------------- danger zone */}
+        <Section title="Danger zone" delay={0.18}>
+          <ListGroup>
+            <FieldRow
+              icon={Trash2}
+              label="Close and delete account"
+              sublabel="Your expenses stay on other people's records"
+              danger
+              chevron
+              onClick={openCloseAccount}
+            />
+          </ListGroup>
+          <GroupNote icon={Info}>
+            Closing releases your email address, so you can sign up again later with the same one.
+          </GroupNote>
+        </Section>
+
       </div>
 
       {/* ================================================ edit profile */}
@@ -722,6 +796,83 @@ export default function SettingsPage() {
         confirmLabel="Log out"
         danger
         onConfirm={signOut}
+      />
+
+      {/* ================================================ close account */}
+      <Sheet
+        open={closeOpen}
+        onClose={() => setCloseOpen(false)}
+        title="Close your account?"
+        subtitle="This cannot be undone."
+        footer={
+          <Button
+            size="lg"
+            block
+            variant="danger"
+            icon={Trash2}
+            loading={closing}
+            disabled={!closePassword || !closeConfirm}
+            onClick={closeAccount}
+          >
+            Close my account
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-[22px] bg-surface-2 p-4">
+            <p className="newq text-[13.5px] leading-relaxed text-ink">
+              Expenses and payments you shared stay exactly as they are. Closing your account does
+              not move anyone&rsquo;s money, and the people you split with can still settle up with
+              you.
+            </p>
+            <p className="newq mt-2.5 text-[13.5px] leading-relaxed">
+              Expenses you added can no longer be edited by anyone, and notifications already sent
+              may still arrive for up to a day.
+            </p>
+          </div>
+
+          {(overview.owed > 0.01 || overview.owe > 0.01) && (
+            <div className="rounded-[22px] bg-blush-soft p-4">
+              <p className="newq text-[13.5px] leading-relaxed text-ink">
+                {overview.owed > 0.01
+                  ? `You still have ${money(overview.owed, prefs.currency)} owed to you. `
+                  : `You still owe ${money(overview.owe, prefs.currency)}. `}
+                Closing your account does not clear it — settle up first if you want it closed.
+              </p>
+            </div>
+          )}
+
+          <Input
+            label="Your password"
+            type="password"
+            icon={Lock}
+            autoComplete="current-password"
+            value={closePassword}
+            onChange={(e) => setClosePassword(e.target.value)}
+          />
+
+          <div>
+            <Input
+              label="Type your email to confirm"
+              icon={KeyRound}
+              placeholder={me.email}
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
+              value={closeConfirm}
+              onChange={(e) => setCloseConfirm(e.target.value)}
+            />
+            <GroupNote icon={Mail}>{me.email}</GroupNote>
+          </div>
+        </div>
+      </Sheet>
+
+      <StatusSheet
+        state={closeStatus}
+        successTitle="Your account is closed"
+        successBody="Thanks for using Splitta. You can sign up again with the same email whenever you like."
+        actionLabel="Done"
+        onClose={finishClose}
       />
 
       <ConfirmSheet

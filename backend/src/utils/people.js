@@ -1,4 +1,4 @@
-const { User, Group, Expense, FriendRequest } = require('../models');
+const { User, Group, Expense, Settlement, FriendRequest } = require('../models');
 const { HttpError } = require('../middleware/error');
 const { uniqueCode } = require('./codes');
 
@@ -27,6 +27,19 @@ function publicUser(user) {
   };
 }
 
+/**
+ * A closed account, as seen by someone who still shares a balance with it.
+ *
+ * The same reduced shape as `publicUser` plus a flag, so the client can say
+ * "closed account" instead of pretending they are still around. The name and
+ * face are kept deliberately: the activity feed already names them in text
+ * written at the time, so blanking the person here would only make history
+ * disagree with itself.
+ */
+function ghostUser(user) {
+  return { ...publicUser(user), deleted: true };
+}
+
 /** The full record, for yourself and for confirmed friends. */
 function friendUser(user) {
   const u = typeof user.toJSON === 'function' ? user.toJSON() : user;
@@ -39,7 +52,11 @@ function friendUser(user) {
  * names resolve on a group screen — they arrive without contact details
  * and with `isFriend: false`, and the client keeps them out of pickers.
  *
- * Anyone outside this set is invisible: no name, no lookup, nothing.
+ * Anyone outside this set is invisible: no name, no lookup, nothing — with
+ * one narrow exception, closed accounts you still share a balance with. A
+ * closing account is pulled out of every friends list and group, so without
+ * that exception the debt would survive while the person naming it did not:
+ * "Someone owes you ₹2,400", with no way to settle it.
  */
 async function visiblePeople(me) {
   const friendIds = (me.friends || []).map(String);
@@ -48,16 +65,45 @@ async function visiblePeople(me) {
     ...new Set(groups.flatMap((g) => g.members.map(String))),
   ].filter((id) => id !== String(me._id) && !friendIds.includes(id));
 
-  const [friends, coMembers] = await Promise.all([
+  const [friends, coMembers, ghosts] = await Promise.all([
     User.find({ _id: { $in: friendIds } }).sort({ name: 1 }),
     User.find({ _id: { $in: coMemberIds } }).sort({ name: 1 }),
+    closedCounterparties(me, [String(me._id), ...friendIds, ...coMemberIds]),
   ]);
 
   return [
     { ...friendUser(me), isSelf: true },
     ...friends.map(friendUser),
     ...coMembers.map(publicUser),
+    ...ghosts.map(ghostUser),
   ];
+}
+
+/**
+ * Closed accounts `me` has a shared expense or settlement with.
+ *
+ * Scoped to closed accounts on purpose. Widening this to every expense
+ * counterparty would quietly undo unfriending — someone you deliberately
+ * removed would reappear because you once split a taxi with them.
+ */
+async function closedCounterparties(me, alreadyVisible) {
+  const seen = new Set(alreadyVisible.map(String));
+
+  const [fromExpenses, settlements] = await Promise.all([
+    Expense.distinct('participants', { participants: me._id }),
+    Settlement.find({ $or: [{ from: me._id }, { to: me._id }] }).select('from to'),
+  ]);
+
+  const candidates = [
+    ...fromExpenses.map(String),
+    ...settlements.flatMap((s) => [String(s.from), String(s.to)]),
+  ].filter((id) => !seen.has(id));
+
+  if (!candidates.length) return [];
+
+  return User.find({ _id: { $in: [...new Set(candidates)] }, deletedAt: { $ne: null } }).sort({
+    name: 1,
+  });
 }
 
 /** ids of everyone `me` may name in an expense, settlement or list. */
@@ -136,4 +182,5 @@ module.exports = {
   friendsAmong,
   requestBetween,
   ensureUserCode,
+  ghostUser,
 };

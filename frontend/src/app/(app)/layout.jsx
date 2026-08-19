@@ -2,10 +2,10 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import AppShell from '@/components/layout/AppShell';
 import { useApp } from '@/store/AppContext';
-import { LogoMark } from '@/components/Logo';
 
 function Booting() {
   return (
@@ -15,7 +15,16 @@ function Booting() {
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <LogoMark size={52} />
+          {/* The real app icon, not the drawn mark — the boot screen should
+              show the same thing as the home-screen tile it launched from. */}
+          <Image
+            src="/icon.png"
+            alt=""
+            width={72}
+            height={72}
+            priority
+            className="size-18 rounded-[22px]"
+          />
         </motion.div>
         <p className="newq text-[13.5px]">Loading your balances…</p>
       </div>

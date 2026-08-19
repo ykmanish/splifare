@@ -117,9 +117,12 @@ router.post(
     const raw = String(req.body.query || req.body.email || req.body.code || '').trim();
     if (!raw) throw new HttpError(400, 'Enter an email address or a Splitta code');
 
+    // `deletedAt: null` on both: a closed account keeps its row so history
+    // resolves, but it must not be findable — nobody should be able to send a
+    // friend request to an account that is gone.
     const target = EMAIL_RE.test(raw)
-      ? await User.findOne({ email: raw.toLowerCase() })
-      : await User.findOne({ code: normaliseCode(raw) });
+      ? await User.findOne({ email: raw.toLowerCase(), deletedAt: null })
+      : await User.findOne({ code: normaliseCode(raw), deletedAt: null });
 
     // One message for both misses — never reveal which emails or codes exist.
     if (!target) throw new HttpError(404, 'No account matches that email or code');

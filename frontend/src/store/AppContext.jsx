@@ -24,6 +24,7 @@ import {
   normFriendRequest,
 } from '@/lib/api';
 import { buildLedger, balancesFor } from '@/lib/balances';
+import { clearExpenseDraft } from '@/lib/draft';
 import { makeConverter, noConvert } from '@/lib/fx';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import {
@@ -212,8 +213,25 @@ export function AppProvider({ children }) {
           })),
         activity: () => api.activity().then((r) => ({ activity: r.activity.map(normActivity) })),
       };
-      const results = await Promise.all(keys.filter((k) => jobs[k]).map((k) => jobs[k]()));
-      patchData(Object.assign({}, ...results));
+      try {
+        const results = await Promise.all(keys.filter((k) => jobs[k]).map((k) => jobs[k]()));
+        patchData(Object.assign({}, ...results));
+      } catch (err) {
+        /*
+         * A 401 here means the session died elsewhere — the account was
+         * closed on another device, or the token expired. Every caller of
+         * `refresh` swallows its rejection, so without this branch a second
+         * tab keeps showing balances for an account that no longer exists
+         * until someone happens to reload it.
+         */
+        if (err?.status === 401) {
+          setToken(null);
+          setMe(null);
+          setData(EMPTY);
+          clearExpenseDraft();
+        }
+        throw err;
+      }
     },
     [patchData],
   );
@@ -537,7 +555,18 @@ export function AppProvider({ children }) {
         setToken(null);
         setMe(null);
         setData(EMPTY);
+        // The draft outlives a session by design (24h), but not an account:
+        // without this the next person to sign in on this device is handed a
+        // half-written expense naming the last one's friends.
+        clearExpenseDraft();
       },
+
+      /**
+       * Close the account. Deliberately does NOT log out on success — the
+       * caller shows a confirmation first, and tearing the session down here
+       * would unmount it before it rendered.
+       */
+      deleteAccount: (body) => api.deleteAccount(body),
 
       updateProfile: async (patch) => {
         const { user } = await api.updateProfile(patch);

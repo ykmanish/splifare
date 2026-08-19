@@ -17,6 +17,10 @@ async function requireAuth(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(payload.sub);
     if (!user) return res.status(401).json({ error: 'Account no longer exists' });
+    // A closed account keeps its row so history still resolves, but its
+    // outstanding tokens must stop working — the same message as a missing
+    // row, so the client's existing 401 handling needs no new branch.
+    if (user.deletedAt) return res.status(401).json({ error: 'Account no longer exists' });
 
     req.user = user;
     req.userId = String(user._id);

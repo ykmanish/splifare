@@ -89,6 +89,12 @@ export const normUser = (u) =>
     avatarBg: u.avatarBg || '',
     /** Chosen handle, e.g. `manish`. Blank until they set one. */
     username: u.username || '',
+    /**
+     * A closed account. The row survives so history still resolves and a
+     * balance with them stays settleable, but they are nobody you can add
+     * to anything new.
+     */
+    deleted: u.deleted === true,
     /** Shareable handle — only ever sent for your own account. */
     code: u.code || '',
     /** UPI address. Present for yourself and for confirmed friends; the
@@ -226,6 +232,8 @@ export const api = {
   login: (body) => post('/auth/login', body, { auth: false }),
   me: () => get('/auth/me'),
   updateProfile: (body) => patch('/auth/me', body),
+  // Not the shared `del` helper: this one carries a body.
+  deleteAccount: (body) => request('/auth/me', { method: 'DELETE', body }),
   changePassword: (body) => post('/auth/password', body),
 
   /* people */

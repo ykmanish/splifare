@@ -62,6 +62,14 @@ const userSchema = new Schema(
     upiId: { type: String, default: '', trim: true, maxlength: 80 },
     /** Confirmed, mutual friendships only — requests live in FriendRequest. */
     friends: [ref('User')],
+    /**
+     * Set when the account is closed. The row survives on purpose: expenses
+     * and settlements name people by id, so destroying it would leave real
+     * balances owed to nobody — unsettleable and unnamed on everyone else's
+     * screen. A closed row keeps the name and face that history already
+     * shows, and nothing else.
+     */
+    deletedAt: { type: Date, default: null },
   },
   {
     ...baseOptions,
@@ -248,6 +256,7 @@ const notificationSchema = new Schema(
         'friend_added',
         'friend_request',
         'friend_accepted',
+        'account_closed',
       ],
       required: true,
     },
