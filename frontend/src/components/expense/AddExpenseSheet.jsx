@@ -7,6 +7,7 @@ import {
   Camera,
   Loader2,
   Lock,
+  Pencil,
   Plus,
   RotateCcw,
   ScanLine,
@@ -37,8 +38,9 @@ import { useToast } from '@/components/ui/Toast';
 import { haptics } from '@/lib/haptics';
 import { readExpenseDraft, writeExpenseDraft, clearExpenseDraft } from '@/lib/draft';
 import { canEditExpense } from '@/lib/permissions';
+import { categoryOf } from '@/lib/categories';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
-import { firstName, dayLabel, money, CURRENCIES } from '@/lib/format';
+import { firstName, dayLabel, money, splitAmount, CURRENCIES } from '@/lib/format';
 import { rateLabel } from '@/lib/fx';
 import { api } from '@/lib/api';
 import { prepareImage, ImageError } from '@/lib/image';
@@ -140,7 +142,14 @@ function initialForm({ editing, prefill, groups, me }) {
   };
 }
 
-export default function AddExpenseSheet({ open, onClose, prefill = {}, editing = null }) {
+export default function AddExpenseSheet({
+  open,
+  onClose,
+  prefill = {},
+  editing = null,
+  openMode = 'edit',
+  onEdit,
+}) {
   const {
     me,
     people,
@@ -575,9 +584,21 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
    * is entitled to see how it was worked out; only its author may change it,
    * which the server enforces independently.
    */
-  if (editing && !canEditExpense(editing, me?.id)) {
+  /*
+   * How an expense opens by default.
+   *
+   * A bill everyone has already agreed to is a record first — tapping a row
+   * shows what it says, and changing it is a separate, deliberate choice from
+   * the row menu. Someone who may not edit it at all lands here too, whichever
+   * door they came through.
+   */
+  const mayEdit = editing ? canEditExpense(editing, me?.id) : false;
+
+  if (editing && (openMode === 'view' || !mayEdit)) {
     const own = editing.currency || currency;
     const author = personById(editing.createdBy);
+    const cat = categoryOf(editing.category);
+    const group = groups.find((g) => g.id === editing.groupId);
     const paidRows = (editing.paidBy || []).map((r) => ({
       person: personById(r.userId),
       amount: r.amount,
@@ -586,19 +607,68 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
       person: personById(r.userId),
       amount: r.amount,
     }));
+    const itemTotal = (editing.items || []).reduce((sum, i) => sum + (Number(i.price) || 0), 0);
+    const {
+      symbol: heroSymbol,
+      whole: heroWhole,
+      cents: heroCents,
+    } = splitAmount(editing.amount, own);
 
     return (
       <Sheet open={open} onClose={onClose} size="lg">
         <div className="space-y-6">
           <SheetHeader
+            className="pt-1"
+            titleClassName="small tracking-[0.02em]"
             title={editing.description}
-            subtitle={`${money(editing.amount, own)} · ${dayLabel(editing.date)}`}
+            subtitle={dayLabel(editing.date)}
           />
 
-          <StatusPill tone="blue" icon={Lock}>
-            Only {author?.id === me?.id ? 'you' : firstName(author?.name || 'whoever added it')} can
-            change this
-          </StatusPill>
+          {/* The number is what the sheet is about, so it is the thing you
+              read first rather than a row buried in a table. Symbol in the UI
+              face and digits in the display face, the same split the dashboard
+              hero uses. */}
+          <div className="rounded-[22px] bg-surface-2 px-5 py-6 text-center">
+            <p className="num text-ink text-[38px] font-bold leading-none">
+              {/* A margin, not a literal space: JSX collapses the space and a
+                  real one is not tunable at this size. */}
+              <span className="mr-2">{heroSymbol}</span>
+              <span className="small">
+                {heroWhole}
+                {heroCents && <span className="text-ink-3 dark:text-ink-2">{heroCents}</span>}
+              </span>
+            </p>
+            <p className="newq mt-2 text-[12.5px]">
+              {splitRows.length === 1
+                ? 'not split with anyone'
+                : `split ${splitRows.length} ways`}
+            </p>
+          </div>
+
+          {!mayEdit && (
+            <StatusPill tone="blue" icon={Lock}>
+              Only {author?.id === me?.id ? 'you' : firstName(author?.name || 'whoever added it')}{' '}
+              can change this
+            </StatusPill>
+          )}
+
+          <div>
+            <GroupLabel>Details</GroupLabel>
+            <ListGroup>
+              <FieldRow label="Date" value={dayLabel(editing.date)} />
+              {cat && <FieldRow label="Category" value={cat.label} />}
+              {group && <FieldRow label="Group" value={group.name} />}
+              {own !== currency && (
+                <FieldRow label="Recorded in" value={CURRENCIES[own]?.name || own} />
+              )}
+              {author && (
+                <FieldRow
+                  label="Added by"
+                  value={author.id === me?.id ? 'You' : author.name}
+                />
+              )}
+            </ListGroup>
+          </div>
 
           <div>
             <GroupLabel>Paid by</GroupLabel>
@@ -619,7 +689,15 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
           </div>
 
           <div>
-            <GroupLabel action={<Hint>{splitRows.length} people</Hint>}>Split between</GroupLabel>
+            <GroupLabel
+              action={
+                <Hint>
+                  {splitRows.length} {splitRows.length === 1 ? 'person' : 'people'}
+                </Hint>
+              }
+            >
+              Split between
+            </GroupLabel>
             <ListGroup>
               {splitRows.map((r) => (
                 <PersonRow
@@ -638,14 +716,30 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
 
           {!!editing.items?.length && (
             <div>
-              <GroupLabel>Items</GroupLabel>
+              <GroupLabel
+                action={
+                  <Hint>
+                    {editing.items.length} · {money(itemTotal, own)}
+                  </Hint>
+                }
+              >
+                Items
+              </GroupLabel>
               <ListGroup>
-                {editing.items.map((item) => (
-                  <FieldRow
-                    key={item.id}
-                    label={item.name}
-                    value={money(item.price, own)}
-                  />
+                {editing.items.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-3.5">
+                    <span
+                      aria-hidden="true"
+                      className="num grid size-7 shrink-0 place-items-center rounded-full
+                        bg-surface-3 text-[12px] font-medium text-ink"
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="newq min-w-0 flex-1 text-[14.5px] text-ink">{item.name}</span>
+                    <span className="num shrink-0 text-[14.5px] font-medium text-ink">
+                      {money(item.price, own)}
+                    </span>
+                  </div>
                 ))}
               </ListGroup>
             </div>
@@ -662,9 +756,23 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
             </div>
           )}
 
-          <Button variant="soft" size="md" block onClick={onClose}>
-            Close
-          </Button>
+          {/* Edit stays a deliberate second step, but it would be perverse to
+              make someone close this and hunt for the row menu again. */}
+          <div className="flex gap-2.5">
+            <Button variant="soft" size="md" className="flex-1" onClick={onClose}>
+              Close
+            </Button>
+            {mayEdit && (
+              <Button
+                size="md"
+                icon={Pencil}
+                className="flex-[1.4]"
+                onClick={() => onEdit?.(editing)}
+              >
+                Edit
+              </Button>
+            )}
+          </div>
         </div>
       </Sheet>
     );

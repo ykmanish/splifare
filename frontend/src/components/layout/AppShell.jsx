@@ -26,7 +26,14 @@ export default function AppShell({ children }) {
   const value = useMemo(
     () => ({
       openExpense: (prefill = {}) => setExpense({ prefill }),
-      editExpense: (e) => setExpense({ editing: e }),
+      /*
+       * Two doors onto one expense. Tapping a row reads it; editing is a
+       * deliberate second choice from the row menu. Opening a bill everyone
+       * has already agreed to straight into an editable form makes a stray
+       * tap look exactly like the start of a change.
+       */
+      viewExpense: (e) => setExpense({ editing: e, mode: 'view' }),
+      editExpense: (e) => setExpense({ editing: e, mode: 'edit' }),
       openSettle: (prefill = {}) => setSettle(prefill),
       openNotifications: () => setNotifOpen(true),
     }),
@@ -52,6 +59,10 @@ export default function AppShell({ children }) {
         onClose={closeExpense}
         prefill={expense?.prefill}
         editing={expense?.editing}
+        openMode={expense?.mode}
+        // Switching in place: the view already has the expense, so moving to
+        // the form is a mode change rather than a close-and-reopen.
+        onEdit={(e) => setExpense({ editing: e, mode: 'edit' })}
       />
 
       <SettleUpSheet open={!!settle} onClose={closeSettle} prefill={settle || {}} />

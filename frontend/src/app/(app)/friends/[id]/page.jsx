@@ -71,7 +71,7 @@ function Header({ title, subtitle, right }) {
 
 function SharedExpenseRow({ expense, onDelete }) {
   const { me, personById, groups, currency } = useApp();
-  const { editExpense } = useUI();
+  const { viewExpense, editExpense } = useUI();
 
   const cat = categoryOf(expense.category);
   const Icon = expense.listId ? ShoppingBasket : cat.icon;
@@ -102,6 +102,7 @@ function SharedExpenseRow({ expense, onDelete }) {
       iconBg={`color-mix(in srgb, ${cat.tint} 13%, transparent)`}
       label={expense.description}
       sublabel={sub}
+      onClick={() => viewExpense(expense)}
       trailing={
         <span className="flex shrink-0 items-center gap-1.5">
           <span className="text-right">

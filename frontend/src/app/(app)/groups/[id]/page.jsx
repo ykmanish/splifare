@@ -84,7 +84,7 @@ function emojiIcon(char) {
 
 /* ------------------------------------------------------------- expenses */
 
-function ExpenseRow({ expense, me, personById, onEdit, onDelete }) {
+function ExpenseRow({ expense, me, personById, onView, onEdit, onDelete }) {
   const cat = categoryOf(expense.category);
   const Icon = expense.listId ? ShoppingBasket : cat.icon;
   const payer = personById(expense.paidBy?.[0]?.userId);
@@ -107,7 +107,7 @@ function ExpenseRow({ expense, me, personById, onEdit, onDelete }) {
         iconBg={`color-mix(in srgb, ${cat.tint} 13%, transparent)`}
         label={expense.description}
         sublabel={sub}
-        onClick={onEdit}
+        onClick={onView}
         trailing={
           Math.abs(net) < 0.005 ? (
             <span className="newq shrink-0 text-[12px]">not involved</span>
@@ -146,7 +146,7 @@ export default function GroupDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { openExpense, openSettle, editExpense } = useUI();
+  const { openExpense, openSettle, viewExpense, editExpense } = useUI();
   const {
     me,
     friends,
@@ -525,6 +525,7 @@ export default function GroupDetailPage() {
                             expense={e}
                             me={me}
                             personById={personById}
+                            onView={() => viewExpense(e)}
                             onEdit={() => editExpense(e)}
                             onDelete={() => setDeletingExpense(e)}
                           />

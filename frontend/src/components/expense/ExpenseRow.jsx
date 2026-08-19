@@ -22,7 +22,7 @@ const EASE = [0.16, 1, 0.3, 1];
  */
 export function ExpenseRow({ expense, showGroup = false }) {
   const { me, personById, groups, currency, deleteExpense } = useApp();
-  const { editExpense } = useUI();
+  const { viewExpense, editExpense } = useUI();
   const { toast } = useToast();
 
   const [confirm, setConfirm] = useState(false);
@@ -69,7 +69,7 @@ export function ExpenseRow({ expense, showGroup = false }) {
           type="button"
           whileTap={{ scale: 0.985 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          onClick={() => editExpense(expense)}
+          onClick={() => viewExpense(expense)}
           className="flex min-w-0 flex-1 items-center gap-3.5 text-left tap"
         >
           <IconTile icon={Icon} tint={cat.tint} size="md" />

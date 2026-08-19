@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/Blocks';
 import AssignSheet from '@/components/lists/AssignSheet';
 import { useApp } from '@/store/AppContext';
+import { useUI } from '@/components/layout/AppShell';
 import { useToast } from '@/components/ui/Toast';
 import { GROCERY_AISLES, guessAisle, UNITS } from '@/lib/categories';
 import { money, firstName, symbolOf } from '@/lib/format';
@@ -107,6 +108,7 @@ function ListDetailInner() {
     me,
     lists,
     groups,
+    expenses,
     people,
     friends,
     currency,
@@ -118,6 +120,7 @@ function ListDetailInner() {
     deleteList,
     startShopping,
   } = useApp();
+  const { viewExpense } = useUI();
 
   const [entry, setEntry] = useState('');
   const [adding, setAdding] = useState(false);
@@ -280,6 +283,10 @@ function ListDetailInner() {
     }
   }
 
+  const listExpense = list?.expenseId
+    ? expenses.find((e) => e.id === list.expenseId)
+    : expenses.find((e) => e.listId === list?.id);
+
   const tiles = completed
     ? [
         {
@@ -287,8 +294,11 @@ function ListDetailInner() {
           label: 'Expense',
           icon: Receipt,
           tone: 'blue',
-          href: list.expenseId ? '/activity' : undefined,
-          disabled: !list.expenseId,
+          // The bill this list became, opened as a record — the same view a
+          // tap on any expense row gives. It used to land on /activity, which
+          // is a feed of everything rather than this one expense.
+          onClick: listExpense ? () => viewExpense(listExpense) : undefined,
+          disabled: !listExpense,
         },
         { id: 'settings', label: 'Settings', icon: Settings2, onClick: () => setEditing(true) },
         {

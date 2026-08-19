@@ -85,7 +85,7 @@ export default function DashboardPage() {
     removeFriend,
     convert,
   } = useApp();
-  const { openExpense, editExpense, openSettle } = useUI();
+  const { openExpense, viewExpense, editExpense, openSettle } = useUI();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -284,6 +284,7 @@ export default function DashboardPage() {
                     label={e.description}
                     sublabel={`Paid by ${payerLabel(e)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
                     value={money(share.owed, own)}
+                    onClick={() => viewExpense(e)}
                     trailing={
                       <span className="flex shrink-0 items-center gap-1.5">
                         {settled && (

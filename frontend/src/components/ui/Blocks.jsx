@@ -179,12 +179,20 @@ export function IconCircle({
    SHEET HEADER — left control · centred title · right control
    ================================================================ */
 
-export function SheetHeader({ title, subtitle, left, right, className = '' }) {
+export function SheetHeader({
+  title,
+  subtitle,
+  left,
+  right,
+  className = '',
+  /** Overrides the title's own face, for sheets that set their own type. */
+  titleClassName = 'newq',
+}) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <div className="w-10 shrink-0">{left}</div>
       <div className="min-w-0 flex-1 text-center">
-        <h2 className="newq  text-ink truncate text-[19px] leading-tight">{title}</h2>
+        <h2 className={`${titleClassName} text-ink truncate text-[19px] leading-tight`}>{title}</h2>
         {subtitle && <p className="newq truncate text-[12.5px]">{subtitle}</p>}
       </div>
       <div className="flex w-10 shrink-0 justify-end">{right}</div>
