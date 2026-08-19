@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Inbox, Plus, Receipt, Trash2 } from 'lucide-react';
+import { Inbox, Plus, Receipt, ScanLine, Trash2 } from 'lucide-react';
 import Page from '@/components/layout/Page';
 import { useUI } from '@/components/layout/AppShell';
 import Button from '@/components/ui/Button';
@@ -12,6 +12,10 @@ import { GroupLabel, ListGroup, FieldRow } from '@/components/ui/Blocks';
 import { useApp } from '@/store/AppContext';
 import { readSharedPayload, clearSharedPayload, parseSharedAmount, parseSharedDescription } from '@/lib/share';
 import { money } from '@/lib/format';
+import { api } from '@/lib/api';
+import { prepareImage, ImageError } from '@/lib/image';
+import { planFromScan } from '@/lib/scan';
+import { useToast } from '@/components/ui/Toast';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -30,6 +34,9 @@ export default function SharePage() {
   const [payload, setPayload] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [canScan, setCanScan] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     let stopped = false;
@@ -53,8 +60,67 @@ export default function SharePage() {
     };
   }, []);
 
+  // Only offered when the server can actually read a photo.
+  useEffect(() => {
+    let alive = true;
+    api
+      .scanStatus()
+      .then((r) => alive && setCanScan(!!r.enabled))
+      .catch(() => alive && setCanScan(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const amount = payload ? parseSharedAmount(payload.text) : null;
   const description = payload ? parseSharedDescription(payload.text) : '';
+
+  /**
+   * Read the shared image into line items rather than guessing one number
+   * out of the shared text.
+   */
+  async function readItems() {
+    if (!payload?.blob || scanning) return;
+    setScanning(true);
+    try {
+      const prepared = await prepareImage(payload.blob);
+      const result = await api.scanReceipt({
+        images: [{ mediaType: prepared.mediaType, data: prepared.base64 }],
+        currency,
+      });
+      const plan = planFromScan(result, { currency });
+
+      if (plan.action === 'reject') {
+        toast({ tone: 'error', title: plan.title, description: plan.body });
+        return;
+      }
+
+      await clearSharedPayload();
+      if (plan.action === 'amount') {
+        openExpense({
+          amount: plan.amount,
+          description: plan.description || description || undefined,
+          currency: plan.currency || undefined,
+        });
+      } else {
+        openExpense({
+          itemized: true,
+          items: plan.rows,
+          description: plan.description || description || undefined,
+          currency: plan.currency || undefined,
+        });
+      }
+      router.replace('/dashboard');
+    } catch (err) {
+      toast({
+        tone: 'error',
+        title: 'Could not read that photo',
+        description: err instanceof ImageError ? err.message : err.message,
+      });
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function useIt() {
     // Cleared before the sheet opens, so a back-navigation cannot replay it.
@@ -114,8 +180,9 @@ export default function SharePage() {
               />
             </Card>
             <p className="newq mt-2 px-1.5 text-[12px]">
-              Held on this device only — Splitta cannot attach images to an expense yet, so read
-              the total off it and it goes in below.
+              {canScan
+                ? 'Read the items off it below. The photo itself is never saved — only what it says.'
+                : 'Held on this device only. Read the total off it and type it in below.'}
             </p>
           </div>
         )}
@@ -145,11 +212,30 @@ export default function SharePage() {
           </ListGroup>
         </div>
 
+        {canScan && payload.blob && (
+          <Button
+            size="lg"
+            block
+            icon={ScanLine}
+            loading={scanning}
+            disabled={scanning}
+            onClick={readItems}
+          >
+            {scanning ? 'Reading the items…' : 'Read the items from this photo'}
+          </Button>
+        )}
+
         <div className="flex gap-2.5">
           <Button variant="soft" size="md" icon={Trash2} className="flex-1" onClick={discard}>
             Discard
           </Button>
-          <Button size="md" icon={Plus} className="flex-[2]" onClick={useIt}>
+          <Button
+            variant={canScan && payload.blob ? 'soft' : 'primary'}
+            size="md"
+            icon={Plus}
+            className="flex-[2]"
+            onClick={useIt}
+          >
             Add as expense
           </Button>
         </div>

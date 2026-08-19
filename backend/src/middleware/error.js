@@ -21,16 +21,25 @@ function errorHandler(err, req, res, _next) {
 
   const dev = process.env.NODE_ENV !== 'production';
   res.status(status).json({
-    error: status >= 500 ? 'Something went wrong on our end' : err.message,
+    // A 5xx message is hidden by default — it usually names something
+    // internal. `expose` is for the few that are written for the user, like
+    // "scanning is not set up on this server".
+    error: status >= 500 && !err.expose ? 'Something went wrong on our end' : err.message,
     ...(status >= 500 && dev ? { message: err.message, stack: err.stack?.split('\n').slice(0, 5) } : {}),
   });
 }
 
-/** Throwable HTTP error. */
+/**
+ * Throwable HTTP error.
+ *
+ * Pass `{ expose: true }` when a 5xx message is meant for the person rather
+ * than the log — otherwise the handler above replaces it.
+ */
 class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, options = {}) {
     super(message);
     this.status = status;
+    if (options.expose) this.expose = true;
   }
 }
 

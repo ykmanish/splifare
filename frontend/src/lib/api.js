@@ -236,6 +236,10 @@ export const api = {
   deleteAccount: (body) => request('/auth/me', { method: 'DELETE', body }),
   changePassword: (body) => post('/auth/password', body),
 
+  /* receipt scanning */
+  scanStatus: () => get('/scan/status'),
+  scanReceipt: (body) => post('/scan/receipt', body),
+
   /* people */
   people: () => get('/friends'),
   removeFriend: (pid) => del(`/friends/${pid}`),

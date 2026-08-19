@@ -233,6 +233,30 @@ const listSchema = new Schema(
 );
 listSchema.index({ members: 1, updatedAt: -1 });
 
+/* ------------------------------------------------------------- ScanUsage */
+
+/**
+ * How many receipt scans an account has run today.
+ *
+ * In Mongo rather than a process Map because a scan costs real money at a
+ * paid API, and a limit that resets on every nodemon restart is not a limit.
+ * The `user: null` row is the whole server's daily count.
+ */
+const scanUsageSchema = new Schema(
+  {
+    user: { ...ref('User'), default: null },
+    /** UTC `YYYY-MM-DD`. */
+    day: { type: String, required: true },
+    count: { type: Number, default: 0 },
+    /** Timestamps of the last few, for the rolling-hour check. */
+    at: [{ type: Date }],
+  },
+  baseOptions,
+);
+scanUsageSchema.index({ user: 1, day: 1 }, { unique: true });
+// Yesterday's counters are of no interest to anything.
+scanUsageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
+
 /* --------------------------------------------------------- Notification */
 
 const notificationSchema = new Schema(
@@ -368,4 +392,5 @@ module.exports = {
   ShoppingList: model('ShoppingList', listSchema),
   Notification: model('Notification', notificationSchema),
   Activity: model('Activity', activitySchema),
+  ScanUsage: model('ScanUsage', scanUsageSchema),
 };

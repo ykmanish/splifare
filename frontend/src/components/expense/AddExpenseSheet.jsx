@@ -1,8 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  Loader2,
+  Lock,
+  Plus,
+  RotateCcw,
+  ScanLine,
+  Trash2,
+  X,
+} from 'lucide-react';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import StatusSheet from '@/components/ui/StatusSheet';
 import Button from '@/components/ui/Button';
@@ -30,6 +40,20 @@ import { canEditExpense } from '@/lib/permissions';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
 import { firstName, dayLabel, money, CURRENCIES } from '@/lib/format';
 import { rateLabel } from '@/lib/fx';
+import { api } from '@/lib/api';
+import { prepareImage, ImageError } from '@/lib/image';
+import { planFromScan, shortfallRow } from '@/lib/scan';
+
+/** Up to three, matching the server's own limit. */
+const MAX_SCAN_IMAGES = 3;
+
+/**
+ * `crypto.randomUUID` needs a secure context, which `http://192.168.x.x`
+ * is not — and testing a PWA from a phone on the LAN is exactly that.
+ */
+const uid = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -81,11 +105,11 @@ function initialForm({ editing, prefill, groups, me }) {
       itemized: (editing.items || []).length > 0,
       items: (editing.items || []).length
         ? editing.items.map((item) => ({
-            id: item.id || crypto.randomUUID(),
+            id: item.id || uid(),
             name: item.name || '',
             price: item.price ? String(item.price) : '',
           }))
-        : [{ id: crypto.randomUUID(), name: '', price: '' }],
+        : [{ id: uid(), name: '', price: '' }],
     };
   }
 
@@ -109,8 +133,10 @@ function initialForm({ editing, prefill, groups, me }) {
     values: {},
     date: new Date().toISOString(),
     notes: '',
-    itemized: false,
-    items: [{ id: crypto.randomUUID(), name: '', price: '' }],
+    // A share can arrive already itemised — a receipt read on the share
+    // screen hands its rows straight over.
+    itemized: !!prefill.itemized,
+    items: prefill.items?.length ? prefill.items : [{ id: uid(), name: '', price: '' }],
   };
 }
 
@@ -152,6 +178,110 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
   const [status, setStatus] = useState(null);
   const [saved, setSaved] = useState({ title: '', body: '' });
 
+  /* ---- reading items out of a photo ---- */
+  const fileRef = useRef(null);
+  /** Bumped on every close, so a slow scan cannot land in a reopened sheet. */
+  const scanRun = useRef(0);
+  const [scanAvailable, setScanAvailable] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [scanError, setScanError] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+
+  /*
+   * Ask once whether this server can scan at all. A control that could only
+   * ever fail is worse than no control, so the panel stays hidden without a
+   * configured reader.
+   */
+  useEffect(() => {
+    if (!open || editing || scanAvailable !== null) return;
+    let alive = true;
+    api
+      .scanStatus()
+      .then((r) => alive && setScanAvailable(!!r.enabled))
+      .catch(() => alive && setScanAvailable(false));
+    return () => {
+      alive = false;
+    };
+  }, [open, editing, scanAvailable]);
+
+  const runScan = useCallback(
+    async (files) => {
+      const picked = Array.from(files || []).slice(0, MAX_SCAN_IMAGES);
+      if (!picked.length) return;
+
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        setScanError({
+          title: 'Reading a photo needs a connection',
+          body: 'Type the items in for now.',
+        });
+        return;
+      }
+
+      const run = scanRun.current;
+      setScanning(true);
+      setScanError(null);
+      try {
+        const images = [];
+        for (const file of picked) {
+          // Sequential on purpose: three 12-megapixel decodes at once is how
+          // a mid-range phone runs out of memory mid-scan.
+          const prepared = await prepareImage(file);
+          images.push({ mediaType: prepared.mediaType, data: prepared.base64 });
+        }
+
+        const result = await api.scanReceipt({ images, currency: cur });
+        if (run !== scanRun.current) return;
+
+        const plan = planFromScan(result, { existingItems: items, currency: cur });
+
+        if (plan.action === 'reject') {
+          setScanError({ title: plan.title, body: plan.body });
+          return;
+        }
+
+        if (plan.currency) setCur(plan.currency);
+        if (plan.description && !description.trim()) {
+          setDescription(plan.description.slice(0, 140));
+        }
+
+        if (plan.action === 'amount') {
+          setAmount(String(plan.amount));
+          setScanResult({ note: plan.note, notes: [], waived: [] });
+          setScanCount((n) => n + picked.length);
+          haptics.success();
+          return;
+        }
+
+        setItems(plan.rows);
+        setItemized(true);
+        setScanResult(plan);
+        setScanCount((n) => n + picked.length);
+        haptics.success();
+      } catch (err) {
+        if (run !== scanRun.current) return;
+        setScanError(
+          err instanceof ImageError
+            ? { title: 'That photo could not be opened', body: err.message }
+            : { title: 'Could not read that photo', body: err.message },
+        );
+      } finally {
+        if (run === scanRun.current) setScanning(false);
+      }
+    },
+    [cur, items, description],
+  );
+
+  /** Swap every scanned row to the other price column the bill printed. */
+  const useListedPrices = useCallback(() => {
+    setItems((rows) =>
+      rows.map((row) =>
+        row.listPrice != null ? { ...row, price: String(row.listPrice), listPrice: null } : row,
+      ),
+    );
+    setScanResult((r) => (r ? { ...r, mrpSwap: null, warning: null } : r));
+  }, []);
+
   /* -------------------------------------------------- pool of people */
 
   const pool = useMemo(() => {
@@ -175,10 +305,26 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
   if (open !== wasOpen) {
     setWasOpen(open);
 
+    /*
+     * Any scan still in flight belongs to the opening that started it. Bumping
+     * the run id here means a reply that arrives after a close-and-reopen is
+     * dropped rather than written into an unrelated form.
+     */
+    scanRun.current += 1;
+    setScanning(false);
+    setScanError(null);
+    setScanResult(null);
+    setScanCount(0);
+
     if (open) {
-      // An edit is always seeded from the expense itself — a stale draft has
-      // no business overwriting a bill that already exists.
-      const draft = editing ? null : readExpenseDraft();
+      /*
+       * An edit is always seeded from the expense itself — a stale draft has
+       * no business overwriting a bill that already exists. Neither does it
+       * over a prefill that carries real content: someone who just read a
+       * receipt is handed those items, not yesterday's half-typed one.
+       */
+      const seeded = prefill.items?.length || prefill.amount || prefill.description;
+      const draft = editing || seeded ? null : readExpenseDraft();
       const f = draft || initialForm({ editing, prefill, groups, me });
 
       applyForm(f);
@@ -202,7 +348,7 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
     setDate(f.date ?? new Date().toISOString());
     setNotes(f.notes ?? '');
     setItemized(!!f.itemized);
-    setItems(f.items?.length ? f.items : [{ id: crypto.randomUUID(), name: '', price: '' }]);
+    setItems(f.items?.length ? f.items : [{ id: uid(), name: '', price: '' }]);
   }
 
   /** Throw the draft away and start from what this opening would have shown. */
@@ -333,13 +479,13 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
   };
 
   const addItem = () => {
-    setItems((rows) => [...rows, { id: crypto.randomUUID(), name: '', price: '' }]);
+    setItems((rows) => [...rows, { id: uid(), name: '', price: '' }]);
   };
 
   const removeItem = (id) => {
     setItems((rows) =>
       rows.length === 1
-        ? [{ id: crypto.randomUUID(), name: '', price: '' }]
+        ? [{ id: uid(), name: '', price: '' }]
         : rows.filter((item) => item.id !== id),
     );
   };
@@ -590,6 +736,112 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
             </Section>
           )}
 
+          {/* ---------------------------------------------- read a photo */}
+          {!editing && scanAvailable && (
+            <Section i={0}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  runScan(e.target.files);
+                  // Cleared so picking the same file twice fires again.
+                  e.target.value = '';
+                }}
+              />
+
+              <div className="rounded-[22px] bg-surface-2 p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-lime-200 text-ink">
+                    <ScanLine size={19} strokeWidth={2.2} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="newq text-[15px] text-ink">
+                      {scanCount ? 'Add another photo' : 'Read items from a photo'}
+                    </p>
+                    <p className="newq mt-0.5 text-[12.5px] leading-snug">
+                      {scanCount
+                        ? `${scanCount} ${scanCount === 1 ? 'photo' : 'photos'} read so far. Check every price before saving.`
+                        : 'A receipt or an order screen. The photo is read and discarded — only the items are kept.'}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="soft"
+                  size="md"
+                  block
+                  className="mt-3"
+                  type="button"
+                  icon={scanning ? Loader2 : Camera}
+                  loading={scanning}
+                  disabled={scanning}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {scanning ? 'Reading…' : scanCount ? 'Add another photo' : 'Choose a photo'}
+                </Button>
+              </div>
+
+              {scanError && (
+                <div className="mt-2 rounded-[18px] bg-blush-soft p-4">
+                  <p className="newq text-[13.5px] text-ink">{scanError.title}</p>
+                  <p className="newq mt-1 text-[12.5px] leading-snug">{scanError.body}</p>
+                </div>
+              )}
+
+              {scanResult?.warning && (
+                <div className="mt-2 rounded-[18px] bg-butter-soft p-4">
+                  <p className="newq flex items-start gap-2 text-[13px] leading-snug text-ink">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    {scanResult.warning}
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {scanResult.mrpSwap && (
+                      <Button variant="soft" size="sm" type="button" onClick={useListedPrices}>
+                        Use the other prices ({money(scanResult.mrpSwap.to, cur)})
+                      </Button>
+                    )}
+                    {scanResult.shortfall > 0 && (
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        type="button"
+                        onClick={() => {
+                          setItems((rows) => [...rows, shortfallRow(scanResult.shortfall)]);
+                          setScanResult((r) => ({ ...r, shortfall: 0, warning: null }));
+                        }}
+                      >
+                        Add the {money(scanResult.shortfall, cur)} difference
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!!scanResult?.notes?.length && (
+                <p className="newq mt-2 px-1.5 text-[12.5px] leading-snug">
+                  {scanResult.notes.join(' ')}
+                </p>
+              )}
+
+              {!!scanResult?.waived?.length && (
+                <p className="newq mt-1.5 px-1.5 text-[12.5px] leading-snug text-ink-3">
+                  {scanResult.waived
+                    .map((w) => `${w.label} ${money(w.originalAmount, cur)} — waived`)
+                    .join(' · ')}
+                </p>
+              )}
+
+              {scanResult?.statedTotal != null && (
+                <p className="newq mt-1.5 px-1.5 text-[12.5px]">
+                  Bill total <span className="num text-ink">{money(scanResult.statedTotal, cur)}</span>
+                </p>
+              )}
+            </Section>
+          )}
+
           {/* -------------------------------------------------- amount */}
           <Section i={0}>
             {itemized ? (
@@ -768,11 +1020,32 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
                     <button
                       type="button"
                       onClick={() => removeItem(item.id)}
-                      aria-label="Remove item"
+                      aria-label={item.name ? `Remove ${item.name}` : `Remove item ${index + 1}`}
                       className="mt-0.5 grid size-10 place-items-center rounded-full bg-surface-2 text-ink-3 tap hover:bg-surface-3 hover:text-ink active:scale-90"
                     >
                       <X size={16} strokeWidth={2.4} />
                     </button>
+
+                    {/* Where the number came from, and a one-tap correction if
+                        the wrong price column was read. */}
+                    {item.listPrice != null && Number(item.listPrice) !== Number(item.price) && (
+                      <button
+                        type="button"
+                        onClick={() => updateItem(item.id, { price: String(item.listPrice) })}
+                        aria-label={`Listed price ${money(item.listPrice, cur)} — tap to use it instead`}
+                        className="num col-start-2 -mt-1.5 text-left text-[11.5px] text-ink-3 line-through tap"
+                      >
+                        {money(item.listPrice, cur)}
+                      </button>
+                    )}
+
+                    {(item.confidence === 'low' || item.duplicate) && (
+                      <p className="newq col-span-3 -mt-1 text-[11.5px] text-butter-deep">
+                        {item.duplicate
+                          ? 'Same name and price as another row — check it is not counted twice.'
+                          : 'This one was hard to read — check it.'}
+                      </p>
+                    )}
                   </div>
                 ))}
                 <div className="px-4 py-3.5">

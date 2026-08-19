@@ -17,6 +17,7 @@ const listRoutes = require('./src/routes/lists');
 const feedRoutes = require('./src/routes/feed');
 const rateRoutes = require('./src/routes/rates');
 const pushRoutes = require('./src/routes/push');
+const scanRoutes = require('./src/routes/scan');
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
@@ -53,6 +54,13 @@ app.use(
   })
 );
 
+/*
+ * The scan route carries base64 photos, so it gets its own larger parser
+ * mounted first. body-parser skips a request whose stream is already drained,
+ * so the 1mb parser below simply passes it through — the global limit stays
+ * where it is for every other route.
+ */
+app.use('/api/scan', express.json({ limit: '6mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {
@@ -74,6 +82,7 @@ app.use('/api/settlements', settlementRoutes);
 app.use('/api/lists', listRoutes);
 app.use('/api/rates', rateRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/scan', scanRoutes);
 app.use('/api', feedRoutes);
 
 app.use(notFound);
