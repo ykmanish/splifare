@@ -104,6 +104,8 @@ const EMPTY = {
   incoming: [],
   outgoing: [],
   myCode: '',
+  /** userId -> when they were last nudged, for the cooldown. */
+  remindedAt: {},
 };
 
 export function AppProvider({ children }) {
@@ -154,8 +156,17 @@ export function AppProvider({ children }) {
   const loadAll = useCallback(async () => {
     setSyncing(true);
     try {
-      const [people, groups, expenses, settlements, lists, notifications, activity, requests] =
-        await Promise.all([
+      const [
+        people,
+        groups,
+        expenses,
+        settlements,
+        lists,
+        notifications,
+        activity,
+        requests,
+        reminders,
+      ] = await Promise.all([
           api.people(),
           api.groups(),
           api.expenses(),
@@ -164,6 +175,10 @@ export function AppProvider({ children }) {
           api.notifications(),
           api.activity(),
           api.friendRequests(),
+          // Who has been nudged lately, so the button can say so instead of
+          // being refused when tapped. Never fatal — a nudge is still sendable
+          // without it, the server just answers 429.
+          api.reminders().catch(() => ({ recent: [] })),
         ]);
 
       setData({
@@ -177,6 +192,9 @@ export function AppProvider({ children }) {
         activity: activity.activity.map(normActivity),
         incoming: requests.incoming.map(normFriendRequest),
         outgoing: requests.outgoing.map(normFriendRequest),
+        remindedAt: Object.fromEntries(
+          (reminders?.recent || []).map((r) => [r.userId, r.at]),
+        ),
       });
       setOffline(false);
     } catch (err) {
@@ -592,6 +610,21 @@ export function AppProvider({ children }) {
         // without this the next person to sign in on this device is handed a
         // half-written expense naming the last one's friends.
         clearExpenseDraft();
+      },
+
+      /**
+       * Nudge someone about what they owe.
+       *
+       * The amount comes back from the server, which worked it out itself —
+       * the client never says what someone owes, it only says who to ask.
+       */
+      remindPerson: async (userId, note) => {
+        const out = await api.sendReminder({ userId, note });
+        setData((d) => ({
+          ...d,
+          remindedAt: { ...d.remindedAt, [userId]: new Date().toISOString() },
+        }));
+        return out;
       },
 
       /**

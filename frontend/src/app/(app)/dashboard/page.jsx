@@ -84,8 +84,12 @@ export default function DashboardPage() {
     deleteGroup,
     removeFriend,
     convert,
+    remindPerson,
+    remindedAt,
   } = useApp();
   const { openExpense, viewExpense, editExpense, openSettle } = useUI();
+  /** Who a nudge is in flight for, so the row can show it working. */
+  const [nudging, setNudging] = useState(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -156,6 +160,39 @@ export default function DashboardPage() {
     overview.net,
     currency,
   );
+
+  /*
+   * Within the server's cooldown, so the button says so rather than being
+   * refused when tapped. Presence is the whole test: the server only returns
+   * reminders still inside the window, so there is no clock arithmetic here —
+   * which also keeps this render pure. A tab left open past the window keeps
+   * saying "Reminded" until the next sync, which is the harmless direction.
+   */
+  const nudgedRecently = (userId) => !!remindedAt?.[userId];
+
+  /**
+   * Nudge someone about what they owe.
+   *
+   * The figure is never sent — the server works out what is owed and puts
+   * that in the notification, so this button cannot be used to claim an
+   * amount, and the two people cannot end up reading different numbers
+   * because one of them tapped at a stale moment.
+   */
+  async function remind(userId, name) {
+    if (nudging) return;
+    setNudging(userId);
+    try {
+      const out = await remindPerson(userId);
+      toast({
+        title: `Reminded ${firstName(name)}`,
+        description: `They will see ${money(out.amount, out.currency)} outstanding.`,
+      });
+    } catch (err) {
+      toast({ tone: 'error', title: 'Could not send that reminder', description: err.message });
+    } finally {
+      setNudging(null);
+    }
+  }
 
   const tiles = [
     { id: 'add', label: 'Add', icon: Plus, tone: 'dark', onClick: () => openExpense() },
@@ -430,12 +467,20 @@ export default function DashboardPage() {
                         >
                           {money(Math.abs(r.amount), currency)}
                         </span>
+                        {/* It used to say "Remind" and open the settle sheet —
+                            tapping it recorded money that had not arrived. */}
                         <Button
                           size="xs"
                           variant={positive ? 'soft' : 'dark'}
-                          onClick={() => openSettle({ withUserId: r.userId })}
+                          loading={nudging === r.userId}
+                          disabled={positive && (nudging === r.userId || nudgedRecently(r.userId))}
+                          onClick={() =>
+                            positive
+                              ? remind(r.userId, p?.name)
+                              : openSettle({ withUserId: r.userId })
+                          }
                         >
-                          {positive ? 'Remind' : 'Pay'}
+                          {positive ? (nudgedRecently(r.userId) ? 'Reminded' : 'Remind') : 'Pay'}
                         </Button>
                         <RowMenu
                           onEdit={() => router.push(`/friends/${r.userId}`)}

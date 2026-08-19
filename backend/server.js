@@ -18,6 +18,7 @@ const feedRoutes = require('./src/routes/feed');
 const rateRoutes = require('./src/routes/rates');
 const pushRoutes = require('./src/routes/push');
 const scanRoutes = require('./src/routes/scan');
+const reminderRoutes = require('./src/routes/reminders');
 const { BUILD, STARTED_AT } = require('./src/utils/build');
 const { CHANGELOG, LATEST } = require('./src/changelog');
 const dns = require('dns');
@@ -101,6 +102,7 @@ app.use('/api/lists', listRoutes);
 app.use('/api/rates', rateRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/reminders', reminderRoutes);
 app.use('/api', feedRoutes);
 
 app.use(notFound);

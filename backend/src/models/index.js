@@ -257,6 +257,30 @@ scanUsageSchema.index({ user: 1, day: 1 }, { unique: true });
 // Yesterday's counters are of no interest to anything.
 scanUsageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
 
+/* -------------------------------------------------------------- Reminder */
+
+/**
+ * A nudge already sent, so the next one can be refused.
+ *
+ * Its own collection rather than a query over Notification: the recipient can
+ * clear their notifications, and a cooldown the person being nudged can reset
+ * for the nudger is not a cooldown.
+ */
+const reminderSchema = new Schema(
+  {
+    from: { ...ref('User'), required: true },
+    to: { ...ref('User'), required: true },
+    /** What was owed when it was sent, in `currency` — for the record only. */
+    amount: { type: Number, default: 0 },
+    currency: { type: String, default: 'INR' },
+    note: { type: String, default: '', maxlength: 140 },
+  },
+  baseOptions,
+);
+reminderSchema.index({ from: 1, to: 1, createdAt: -1 });
+// A cooldown is measured in hours; a month of history is more than enough.
+reminderSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 /* --------------------------------------------------------- Notification */
 
 const notificationSchema = new Schema(
@@ -393,4 +417,5 @@ module.exports = {
   Notification: model('Notification', notificationSchema),
   Activity: model('Activity', activitySchema),
   ScanUsage: model('ScanUsage', scanUsageSchema),
+  Reminder: model('Reminder', reminderSchema),
 };

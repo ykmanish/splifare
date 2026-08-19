@@ -239,6 +239,10 @@ export const api = {
   /** The build the server is running. Public — it is only an id. */
   version: () => get('/version', { auth: false }),
 
+  /* nudges */
+  reminders: () => get('/reminders'),
+  sendReminder: (body) => post('/reminders', body),
+
   /* receipt scanning */
   scanStatus: () => get('/scan/status'),
   scanReceipt: (body) => post('/scan/receipt', body),
