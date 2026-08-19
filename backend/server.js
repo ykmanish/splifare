@@ -1,9 +1,11 @@
 require('dotenv').config();
 
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 
 const { connectDB } = require('./src/config/db');
+const { initRealtime } = require('./src/realtime');
 const { notFound, errorHandler } = require('./src/middleware/error');
 
 const authRoutes = require('./src/routes/auth');
@@ -82,7 +84,15 @@ app.use(errorHandler);
 async function start() {
   try {
     await connectDB();
-    app.listen(PORT, () => {
+
+    /*
+     * An explicit http server rather than app.listen, because socket.io has to
+     * share the same port and attach to it.
+     */
+    const server = http.createServer(app);
+    initRealtime(server, { allowedOrigins: allowed });
+
+    server.listen(PORT, () => {
       console.log(`\n  Splitta API ready → http://localhost:${PORT}`);
       console.log(`  CORS allows      → ${allowed.join(', ')}\n`);
     });

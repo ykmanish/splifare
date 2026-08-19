@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/ui/Bits';
 import Button from '@/components/ui/Button';
 import { ConfirmSheet } from '@/components/ui/Sheet';
 import { useToast } from '@/components/ui/Toast';
+import { lockScroll } from '@/lib/scrollLock';
 
 const KIND = {
   expense_added: { icon: Receipt, tint: 'var(--brand)' },
@@ -76,15 +77,15 @@ export default function NotificationPanel({ open, onClose }) {
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
+    return lockScroll();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && onClose();
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   /** Consecutive runs of the same day → one GroupLabel + one ListGroup each. */

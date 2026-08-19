@@ -87,6 +87,8 @@ export const normUser = (u) =>
     avatarSeed: u.avatarSeed || '',
     avatarStyle: u.avatarStyle || 'adventurer',
     avatarBg: u.avatarBg || '',
+    /** Chosen handle, e.g. `manish`. Blank until they set one. */
+    username: u.username || '',
     /** Shareable handle — only ever sent for your own account. */
     code: u.code || '',
     /** UPI address. Present for yourself and for confirmed friends; the

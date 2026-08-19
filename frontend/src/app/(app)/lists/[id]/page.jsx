@@ -333,7 +333,7 @@ function ListDetailInner() {
         <motion.div {...rise(0)}>
           <Card tone="sky">
             <div className="flex items-center gap-3.5">
-              <span className="grid size-14 shrink-0 place-items-center rounded-[18px] bg-white/70 text-[26px] leading-none">
+              <span className="grid size-14 shrink-0 place-items-center rounded-[18px] bg-white/70 dark:bg-white/10 text-[26px] leading-none">
                 {list.emoji}
               </span>
 

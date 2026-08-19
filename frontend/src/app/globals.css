@@ -138,20 +138,20 @@
   /* Dark keeps the same six hues, as translucent washes over the canvas —
      opaque pastels would glow. Stronger than before so a card still reads
      as its colour rather than as grey. */
-  --butter: rgba(245, 199, 88, 0.2);
-  --butter-soft: rgba(245, 199, 88, 0.12);
+  --butter: rgba(245, 199, 88, 0.26);
+  --butter-soft: rgba(245, 199, 88, 0.16);
   --butter-deep: #e8a44a;
-  --mint: rgba(46, 224, 165, 0.19);
-  --mint-soft: rgba(46, 224, 165, 0.11);
+  --mint: rgba(46, 224, 165, 0.25);
+  --mint-soft: rgba(46, 224, 165, 0.15);
   --mint-deep: #2ee0a5;
-  --blush: rgba(255, 107, 115, 0.19);
-  --blush-soft: rgba(255, 107, 115, 0.11);
-  --sky: rgba(95, 157, 255, 0.19);
-  --sky-soft: rgba(95, 157, 255, 0.11);
-  --grape: rgba(154, 140, 255, 0.2);
-  --grape-soft: rgba(154, 140, 255, 0.12);
-  --peach: rgba(250, 160, 95, 0.2);
-  --peach-soft: rgba(250, 160, 95, 0.12);
+  --blush: rgba(255, 107, 115, 0.25);
+  --blush-soft: rgba(255, 107, 115, 0.15);
+  --sky: rgba(95, 157, 255, 0.25);
+  --sky-soft: rgba(95, 157, 255, 0.15);
+  --grape: rgba(154, 140, 255, 0.26);
+  --grape-soft: rgba(154, 140, 255, 0.16);
+  --peach: rgba(250, 160, 95, 0.26);
+  --peach-soft: rgba(250, 160, 95, 0.16);
 
   --pos: #2ee0a5;
   --pos-soft: rgba(46, 224, 165, 0.14);

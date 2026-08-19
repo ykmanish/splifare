@@ -42,7 +42,7 @@ function ListCard({ list, currency, tone, onEdit, onDelete }) {
   return (
     <Card as={Link} href={href} tone={completed ? 'mint' : tone} className="block tap">
       <div className="flex items-start gap-3.5">
-        <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-white/70 text-[22px] leading-none">
+        <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-white/70 dark:bg-white/10 text-[22px] leading-none">
           {list.emoji}
         </span>
 
@@ -131,7 +131,7 @@ function ListsInner() {
         <motion.div {...rise(0)}>
           <Card tone="sky">
             <div className="flex items-start gap-3.5">
-              <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-white/70 text-ink">
+              <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-white/70 dark:bg-white/10 text-ink">
                 <Store size={19} strokeWidth={2.2} />
               </span>
               <div className="min-w-0">

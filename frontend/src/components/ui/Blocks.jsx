@@ -155,7 +155,8 @@ export function IconCircle({
     neutral: 'bg-surface-2 text-ink',
     dark: 'bg-panel text-white',
     neg: 'bg-blush text-neg',
-    blue: 'bg-sky text-brand',
+    // Ink, not lime: lime on pale blue is ~1.2:1 and the glyph disappears.
+    blue: 'bg-sky text-ink',
   }[tone];
 
   const Tag = href ? Link : 'button';
@@ -377,7 +378,7 @@ export function BubbleTile({
         className={`flex h-full w-full flex-col justify-between rounded-[24px] text-left tap
           ${BUBBLE_TONES[tone] || BUBBLE_TONES.lavender} ${pad} ${className}`}
       >
-        <span className="grid size-11 place-items-center rounded-full bg-white/70">
+        <span className="grid size-11 place-items-center rounded-full bg-white/70 dark:bg-white/10">
           {Icon ? (
             <Icon size={20} strokeWidth={2.1} className="text-ink" />
           ) : (

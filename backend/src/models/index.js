@@ -48,6 +48,12 @@ const userSchema = new Schema(
      */
     code: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
     /**
+     * Chosen handle, e.g. `manish`. Optional — the UI falls back to a name
+     * until one is set — but unique once taken, since it is how people are
+     * shown to each other.
+     */
+    username: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+    /**
      * UPI virtual payment address, e.g. `name@okhdfcbank`. Lets a friend
      * settle by opening their own UPI app instead of leaving for a bank
      * transfer. Visible to confirmed friends only — it is a payment handle,

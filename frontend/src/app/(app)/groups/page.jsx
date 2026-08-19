@@ -374,7 +374,7 @@ function GroupTile({ group, index, currency, onEdit, onDelete }) {
           href={`/groups/${group.id}`}
           className="flex min-w-0 flex-1 items-center gap-3 tap active:scale-[0.99]"
         >
-          <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-white/70 text-[23px]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-white/70 dark:bg-white/10 text-[23px]">
             {group.emoji}
           </span>
 

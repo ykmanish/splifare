@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
+  AtSign,
   User,
   Mail,
   Phone,
@@ -36,6 +37,7 @@ import { useApp } from '@/store/AppContext';
 import { pushReason } from '@/lib/push';
 import { haptics, hapticsEnabled, hapticsSupported, setHapticsEnabled } from '@/lib/haptics';
 import { isValidUpiId } from '@/lib/upi';
+import { handleOf, normalizeUsername, usernameError } from '@/lib/username';
 import { useToast } from '@/components/ui/Toast';
 import { CURRENCIES } from '@/lib/format';
 
@@ -100,6 +102,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(me.name);
   const [email, setEmail] = useState(me.email || '');
   const [phone, setPhone] = useState(me.phone || '');
+  const [username, setUsername] = useState(me.username || '');
   const [upiId, setUpiId] = useState(me.upiId || '');
   const [avatarSeed, setAvatarSeed] = useState(me.avatarSeed || me.name || me.id);
   const [avatarStyle, setAvatarStyle] = useState(me.avatarStyle || 'adventurer');
@@ -133,9 +136,9 @@ export default function SettingsPage() {
       : pushOn
         ? 'On'
         : 'Off';
-  const handle = me.email
-    ? `@${me.email.split('@')[0]}`
-    : `@${String(me.name || 'you').toLowerCase().replace(/\s+/g, '')}`;
+  // No invented handle: until they pick one there is nothing to show, and the
+  // line becomes the prompt to pick one.
+  const handle = handleOf(me);
 
   async function togglePush(next) {
     if (pushBusy) return;
@@ -186,6 +189,7 @@ export default function SettingsPage() {
         name: name.trim() || me.name,
         email: email.trim(),
         phone: phone.trim(),
+        username: normalizeUsername(username),
         upiId: upiId.trim(),
         avatarSeed: avatarSeed.trim() || name.trim() || me.name,
         avatarStyle,
@@ -211,6 +215,7 @@ export default function SettingsPage() {
     setName(me.name);
     setEmail(me.email || '');
     setPhone(me.phone || '');
+    setUsername(me.username || '');
     setUpiId(me.upiId || '');
     if (currentIndex >= 0) {
       setAvatarIndex(currentIndex);
@@ -284,7 +289,17 @@ export default function SettingsPage() {
         >
           <Avatar person={me} size="2xl" />
           <p className="newq  text-ink mt-4 text-[21px]">{me.name}</p>
-          <p className="newq mt-0.5 text-[13.5px]">{handle}</p>
+          {handle ? (
+            <p className="newq mt-0.5 text-[13.5px]">{handle}</p>
+          ) : (
+            <button
+              type="button"
+              onClick={openProfileEditor}
+              className="newq mt-0.5 text-[13.5px] text-ink underline decoration-dotted underline-offset-4"
+            >
+              Choose a username
+            </button>
+          )}
 
           <Button
             variant="soft"
@@ -552,6 +567,28 @@ export default function SettingsPage() {
               setDirty(true);
             }}
           />
+
+          <div>
+            <Input
+              label="Username"
+              hint="optional"
+              icon={AtSign}
+              placeholder="yourname"
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setDirty(true);
+              }}
+              error={usernameError(username)}
+            />
+            <GroupNote icon={AtSign}>
+              How you appear to friends. 3–20 characters — letters, numbers, dots
+              and underscores. Leave it empty to go by your name instead.
+            </GroupNote>
+          </div>
 
           <div>
             <Input

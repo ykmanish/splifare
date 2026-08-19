@@ -49,6 +49,7 @@ import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balancesFor, netByMember, simplify, shareOf } from '@/lib/balances';
+import { canEditExpense } from '@/lib/permissions';
 import { money, firstName, dayLabel, splitAmount } from '@/lib/format';
 import { categoryOf, GROUP_EMOJIS } from '@/lib/categories';
 
@@ -92,6 +93,7 @@ function ExpenseRow({ expense, me, personById, onEdit, onDelete }) {
 
   // Its own currency, so a €40 dinner never renders as "₹40".
   const own = expense.currency;
+  const mine = canEditExpense(expense, me?.id);
   const sub = isMe
     ? `You paid ${money(expense.amount, own)}`
     : `${firstName(payer.name)} paid ${money(expense.amount, own)}`;
@@ -122,16 +124,18 @@ function ExpenseRow({ expense, me, personById, onEdit, onDelete }) {
         }
       />
 
-      <div className="pr-3">
-        <RowMenu
-          title={expense.description}
-          subtitle={sub}
-          editLabel="Edit expense"
-          deleteLabel="Delete expense"
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      </div>
+      {mine && (
+        <div className="pr-3">
+          <RowMenu
+            title={expense.description}
+            subtitle={sub}
+            editLabel="Edit expense"
+            deleteLabel="Delete expense"
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      )}
     </div>
   );
 }

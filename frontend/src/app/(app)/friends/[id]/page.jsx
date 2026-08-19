@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
+  AtSign,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -36,9 +37,11 @@ import { ConfirmSheet } from '@/components/ui/Sheet';
 import { useToast } from '@/components/ui/Toast';
 import { useApp } from '@/store/AppContext';
 import { balanceBetween, isInvolved, shareOf } from '@/lib/balances';
+import { canEditExpense } from '@/lib/permissions';
 import FxNote from '@/components/ui/FxNote';
 import { categoryOf } from '@/lib/categories';
 import { money, firstName, relativeTime, dayLabel } from '@/lib/format';
+import { handleOf } from '@/lib/username';
 
 const EASE = [0.16, 1, 0.3, 1];
 const enter = (i = 0) => ({
@@ -80,6 +83,7 @@ function SharedExpenseRow({ expense, onDelete }) {
   // One expense is exact in the currency it was recorded in — showing a €40
   // dinner under the viewer's ₹ symbol would misstate it outright.
   const own = expense.currency || currency;
+  const mine = canEditExpense(expense, me?.id);
 
   const sub = [
     isMe
@@ -116,15 +120,17 @@ function SharedExpenseRow({ expense, onDelete }) {
             )}
           </span>
 
-          <RowMenu
-            title={expense.description}
-            subtitle={sub}
-            editLabel="Edit expense"
-            deleteLabel="Delete expense"
-            onEdit={() => editExpense(expense)}
-            onDelete={() => onDelete(expense)}
-            className="-mr-1.5"
-          />
+          {mine && (
+            <RowMenu
+              title={expense.description}
+              subtitle={sub}
+              editLabel="Edit expense"
+              deleteLabel="Delete expense"
+              onEdit={() => editExpense(expense)}
+              onDelete={() => onDelete(expense)}
+              className="-mr-1.5"
+            />
+          )}
         </span>
       }
     />
@@ -245,6 +251,7 @@ export default function FriendDetailPage() {
       : `You owe ${firstName(person.name)}`;
 
   const contact = [
+    handleOf(person) && { id: 'username', icon: AtSign, label: handleOf(person) },
     person.email && { id: 'email', icon: Mail, label: person.email, href: `mailto:${person.email}` },
     person.phone && { id: 'phone', icon: Phone, label: person.phone, href: `tel:${person.phone}` },
   ].filter(Boolean);
@@ -323,7 +330,7 @@ export default function FriendDetailPage() {
               <GroupLabel>Contact</GroupLabel>
               <ListGroup tone="surface">
                 {contact.map((c) => (
-                  <FieldRow key={c.id} icon={c.icon} label={c.label} href={c.href} chevron />
+                  <FieldRow key={c.id} icon={c.icon} label={c.label} href={c.href} chevron={!!c.href} />
                 ))}
               </ListGroup>
             </motion.section>

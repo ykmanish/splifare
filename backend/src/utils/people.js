@@ -14,6 +14,9 @@ function publicUser(user) {
   return {
     id: String(u.id || u._id),
     name: u.name,
+    // A username is a handle by design — it is how people refer to each other —
+    // so unlike email and phone it survives into the public shape.
+    username: u.username || '',
     email: '',
     phone: '',
     currency: u.currency || 'INR',

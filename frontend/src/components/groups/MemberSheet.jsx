@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { DoorOpen, KeyRound, Mail, UserMinus, UserRound } from 'lucide-react';
+import { AtSign, DoorOpen, KeyRound, Mail, UserMinus, UserRound } from 'lucide-react';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import Avatar from '@/components/ui/Avatar';
 import { Badge, Card } from '@/components/ui/Bits';
 import { FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import { money, firstName } from '@/lib/format';
+import { handleOf } from '@/lib/username';
 
 /**
  * One member's card, opened by tapping their row.
@@ -111,6 +112,11 @@ export default function MemberSheet({
           <div>
             <GroupLabel>Details</GroupLabel>
             <ListGroup>
+              {/* A handle is public, so it shows whether or not you are friends. */}
+              {!!handleOf(person) && (
+                <FieldRow icon={AtSign} label={handleOf(person)} sublabel="Username" />
+              )}
+
               {friend && person.email ? (
                 <FieldRow icon={Mail} label={person.email} sublabel="Email" />
               ) : (

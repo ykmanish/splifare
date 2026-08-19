@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Send, Check, AlertCircle } from 'lucide-react';
+import { lockScroll } from '@/lib/scrollLock';
 
 /** Scalloped disc behind the state glyph, as in the reference. */
 function Scallop({ tone = 'pos', children }) {
@@ -46,12 +47,8 @@ export default function StatusSheet({
   const open = !!state;
 
   useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    if (!open) return undefined;
+    return lockScroll();
   }, [open]);
 
   if (typeof document === 'undefined') return null;
@@ -65,7 +62,7 @@ export default function StatusSheet({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-120 flex items-end justify-center">
+        <div className="fixed inset-0 z-180 flex items-end justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

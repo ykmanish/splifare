@@ -218,7 +218,7 @@ export default function JoinGroupSheet({
           >
             <GroupLabel>This code opens</GroupLabel>
             <Card tone="limeSoft" className="flex items-center gap-3.5">
-              <span className="grid size-13 shrink-0 place-items-center rounded-[16px] bg-white/70 text-[24px]">
+              <span className="grid size-13 shrink-0 place-items-center rounded-[16px] bg-white/70 dark:bg-white/10 text-[24px]">
                 {found.emoji}
               </span>
               <span className="min-w-0 flex-1">

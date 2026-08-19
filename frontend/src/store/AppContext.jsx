@@ -25,6 +25,7 @@ import {
 } from '@/lib/api';
 import { buildLedger, balancesFor } from '@/lib/balances';
 import { makeConverter, noConvert } from '@/lib/fx';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
 import {
   registerServiceWorker,
   currentSubscription,
@@ -118,6 +119,9 @@ export function AppProvider({ children }) {
   /** 'granted' | 'denied' | 'default' | 'unsupported', plus whether this
       browser currently holds a subscription. */
   const [push, setPush] = useState({ permission: 'default', subscribed: false, ready: false });
+
+  /** True while a websocket is connected and authenticated. */
+  const [live, setLive] = useState(false);
 
   const patchData = useCallback((patch) => setData((d) => ({ ...d, ...patch })), []);
 
@@ -237,6 +241,56 @@ export function AppProvider({ children }) {
     })();
   }, [loadAll, loadRates]);
 
+  /* ---------------------------------------------------- realtime */
+
+  /*
+   * One socket for the session. The server sends only the names of the slices
+   * that changed, so every message funnels into the same `refresh` the rest of
+   * the app uses — no second code path that could disagree with a fetch.
+   */
+  useEffect(() => {
+    if (!ready || !me) return undefined;
+
+    const sock = connectSocket();
+    if (!sock) return undefined;
+
+    const onReady = () => setLive(true);
+    const onDisconnect = () => setLive(false);
+
+    const onSync = (payload) => {
+      const scopes = Array.isArray(payload?.scopes) ? payload.scopes : [];
+      if (!scopes.length) return;
+      // A failed refresh is not worth surfacing: the slow poll will retry.
+      refresh(scopes).catch(() => {});
+    };
+
+    /*
+     * A notification arrives as its own event as well as inside a sync, so the
+     * bell can react on the same tick rather than after a round trip.
+     */
+    const onNotification = () => {
+      refresh(['notifications']).catch(() => {});
+    };
+
+    sock.on('ready', onReady);
+    sock.on('connect', onReady);
+    sock.on('disconnect', onDisconnect);
+    sock.on('connect_error', onDisconnect);
+    sock.on('sync', onSync);
+    sock.on('notification', onNotification);
+
+    return () => {
+      sock.off('ready', onReady);
+      sock.off('connect', onReady);
+      sock.off('disconnect', onDisconnect);
+      sock.off('connect_error', onDisconnect);
+      sock.off('sync', onSync);
+      sock.off('notification', onNotification);
+      disconnectSocket();
+      setLive(false);
+    };
+  }, [ready, me, refresh]);
+
   /* ---------------------------------------------------- push */
 
   /**
@@ -319,9 +373,12 @@ export function AppProvider({ children }) {
       }
     };
 
-    // With push delivering, the poll is only a safety net for missed
-    // messages, so it drops to a fifth of the rate.
-    const interval = setInterval(tick, pushLive ? 75000 : 15000);
+    /*
+     * The poll is a fallback, not the mechanism. With a socket connected it
+     * only exists to catch anything missed while the tab was suspended, so it
+     * drops right back; without one it carries the app as before.
+     */
+    const interval = setInterval(tick, live ? 120000 : pushLive ? 75000 : 15000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') tick();
     };
@@ -334,7 +391,7 @@ export function AppProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [ready, me, pushLive]);
+  }, [ready, me, pushLive, live]);
 
   /* ---------------------------------------------------- theme */
 
@@ -744,6 +801,7 @@ export function AppProvider({ children }) {
       fx,
       convert,
       push,
+      live,
       ledger,
       overview,
       unreadCount,
@@ -762,6 +820,7 @@ export function AppProvider({ children }) {
       fx,
       convert,
       push,
+      live,
       ledger,
       overview,
       unreadCount,

@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion';
 import { X } from 'lucide-react';
+import { lockScroll } from '@/lib/scrollLock';
+
+const subscribeNever = () => () => {};
+const onClient = () => true;
+const onServer = () => false;
 
 export const SPRING = { type: 'spring', damping: 32, stiffness: 340, mass: 0.85 };
 export const SPRING_SOFT = { type: 'spring', damping: 28, stiffness: 260, mass: 0.9 };
@@ -26,19 +31,23 @@ export default function Sheet({
   const y = useMotionValue(0);
   const backdrop = useTransform(y, [0, 400], [1, 0.35]);
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  /* The portal target is client-only, so the server renders nothing and the
+     client must agree on its hydrating pass. */
+  const mounted = useSyncExternalStore(subscribeNever, onClient, onServer);
+
+  /* Split from the key handler on purpose: `onClose` is nearly always an
+     inline arrow, so a combined effect would tear the lock down and rebuild it
+     on every parent render. This one only cares whether the sheet is open. */
+  useEffect(() => {
+    if (!open) return undefined;
+    return lockScroll();
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && dismissable && onClose?.();
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, dismissable]);
 
   useEffect(() => {
@@ -50,7 +59,7 @@ export default function Sheet({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 z-150 flex items-end justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

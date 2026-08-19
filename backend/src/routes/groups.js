@@ -5,6 +5,7 @@ const { HttpError } = require('../middleware/error');
 const { notify, logActivity } = require('../utils/feed');
 const { uniqueCode, normaliseCode } = require('../utils/codes');
 const { publicUser, friendUser } = require('../utils/people');
+const { emitSync } = require('../realtime');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -106,6 +107,9 @@ router.post(
       entityId: String(group._id),
     });
 
+    // Joining changes the member list and makes co-members visible.
+    emitSync(group.members.map(String), ['groups', 'people']);
+
     res.status(201).json({ group: group.toJSON() });
   }),
 );
@@ -117,6 +121,7 @@ router.post(
     const group = await memberGroup(req.params.id, req.userId);
     group.code = await uniqueCode(Group, { length: 6 });
     await group.save();
+    emitSync(group.members.map(String), ['groups']);
     res.json({ group: group.toJSON() });
   }),
 );
@@ -216,6 +221,10 @@ router.patch(
     }
 
     await group.save();
+    emitSync([...group.members.map(String), ...(req.body.memberIds || []).map(String)], [
+      'groups',
+      'people',
+    ]);
     res.json({ group: group.toJSON() });
   }),
 );
@@ -263,6 +272,8 @@ router.post(
       entityId: String(group._id),
     });
 
+    emitSync([...remaining.map(String), req.userId], ['groups', 'people', 'lists']);
+
     res.json({ ok: true });
   }),
 );
@@ -272,9 +283,12 @@ router.delete(
   asyncHandler(async (req, res) => {
     const group = await memberGroup(req.params.id, req.userId);
 
+    const audience = group.members.map(String);
     await Expense.deleteMany({ group: group._id });
     await ShoppingList.updateMany({ group: group._id }, { $set: { group: null } });
     await group.deleteOne();
+
+    emitSync(audience, ['groups', 'expenses', 'lists']);
 
     res.json({ ok: true });
   }),

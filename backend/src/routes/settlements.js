@@ -5,6 +5,7 @@ const { HttpError } = require('../middleware/error');
 const { round2, formatMoney } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
 const { canTransactWith } = require('../utils/people');
+const { emitSync } = require('../realtime');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -86,6 +87,8 @@ router.post(
       entityId: String(other._id),
     });
 
+    emitSync([from, to], ['settlements']);
+
     res.status(201).json({ settlement: settlement.toJSON() });
   }),
 );
@@ -98,7 +101,9 @@ router.delete(
     if (String(s.from) !== req.userId && String(s.to) !== req.userId) {
       throw new HttpError(403, 'Not your payment to remove');
     }
+    const pair = [String(s.from), String(s.to)];
     await s.deleteOne();
+    emitSync(pair, ['settlements']);
     res.json({ ok: true });
   }),
 );

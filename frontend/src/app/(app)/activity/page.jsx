@@ -20,6 +20,7 @@ import { FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import { ConfirmSheet } from '@/components/ui/Sheet';
 import { useToast } from '@/components/ui/Toast';
 import { useApp } from '@/store/AppContext';
+import { canEditExpense } from '@/lib/permissions';
 import { money, dayLabel, relativeTime } from '@/lib/format';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -132,6 +133,7 @@ function FeedRow({ item, actor, currency, href, menu }) {
 
 export default function ActivityPage() {
   const {
+    me,
     activity,
     personById,
     currency,
@@ -195,6 +197,9 @@ export default function ActivityPage() {
     const base = { title: t.name, subtitle: t.label };
 
     if (t.kind === 'expense') {
+      // Someone else's expense gets no edit or delete here either; the row
+      // still opens it, read-only.
+      if (!canEditExpense(t.entity, me?.id)) return null;
       return {
         ...base,
         editLabel: 'Edit expense',

@@ -5,6 +5,7 @@ const { HttpError } = require('../middleware/error');
 const { round2, splitsBalance, formatMoney } = require('../utils/money');
 const { notify, logActivity } = require('../utils/feed');
 const { assertReachable } = require('../utils/people');
+const { emitSync } = require('../realtime');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,6 +23,28 @@ const toItems = (rows = []) =>
       price: round2(r.price),
     }))
     .filter((r) => r.name && r.price > 0);
+
+/**
+ * Only whoever entered an expense may change or remove it.
+ *
+ * Being a participant is not enough: everyone on a split can see it, but a
+ * flatmate silently editing the rent you recorded — or deleting it — is a
+ * balance changing under you with no trace of who did it.
+ *
+ * Expenses written before `createdBy` existed fall back to the old rule, so a
+ * legacy row cannot become uneditable by anyone.
+ */
+function assertOwner(expense, userId, verb) {
+  if (!expense.createdBy) {
+    if (!expense.participants.some((p) => String(p) === String(userId))) {
+      throw new HttpError(403, 'You are not part of this expense');
+    }
+    return;
+  }
+  if (String(expense.createdBy) !== String(userId)) {
+    throw new HttpError(403, `Only the person who added this expense can ${verb} it`);
+  }
+}
 
 function validate(body) {
   const amount = round2(body.amount);
@@ -132,6 +155,8 @@ router.post(
       entityId: String(group?._id || expense._id),
     });
 
+    emitSync(audience, ['expenses']);
+
     res.status(201).json({ expense: expense.toJSON() });
   }),
 );
@@ -141,9 +166,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const expense = await Expense.findById(req.params.id);
     if (!expense) throw new HttpError(404, 'Expense not found');
-    if (!expense.participants.some((p) => String(p) === req.userId)) {
-      throw new HttpError(403, 'You are not part of this expense');
-    }
+    assertOwner(expense, req.userId, 'edit');
 
     const { amount, description, paidBy, splits, items } = validate({
       amount: req.body.amount ?? expense.amount,
@@ -188,6 +211,8 @@ router.patch(
       entityId: String(expense._id),
     });
 
+    emitSync(expense.participants.map(String), ['expenses']);
+
     res.json({ expense: expense.toJSON() });
   }),
 );
@@ -197,9 +222,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const expense = await Expense.findById(req.params.id);
     if (!expense) throw new HttpError(404, 'Expense not found');
-    if (!expense.participants.some((p) => String(p) === req.userId)) {
-      throw new HttpError(403, 'You are not part of this expense');
-    }
+    assertOwner(expense, req.userId, 'delete');
 
     const audience = expense.participants.map(String);
     const { description, amount, currency } = expense;
@@ -215,6 +238,8 @@ router.delete(
       entityType: 'expense',
       entityId: String(req.params.id),
     });
+
+    emitSync(audience, ['expenses']);
 
     res.json({ ok: true });
   }),

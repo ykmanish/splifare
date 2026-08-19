@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast';
 import { categoryOf } from '@/lib/categories';
 import { money, dayLabel, firstName } from '@/lib/format';
 import { shareOf } from '@/lib/balances';
+import { canEditExpense } from '@/lib/permissions';
 import { useApp } from '@/store/AppContext';
 import { useUI } from '@/components/layout/AppShell';
 
@@ -32,6 +33,9 @@ export function ExpenseRow({ expense, showGroup = false }) {
   const isMe = payer?.id === me?.id;
   const { net } = shareOf(expense, me?.id);
   const group = groups.find((g) => g.id === expense.groupId);
+  // Offered only to whoever entered it; the server enforces the same rule.
+  const mine = canEditExpense(expense, me?.id);
+
 
   // A single expense is exact in the currency it was recorded in. Formatting
   // a €40 dinner with the viewer's ₹ symbol would just be a lie.
@@ -91,14 +95,16 @@ export function ExpenseRow({ expense, showGroup = false }) {
           </span>
         </motion.button>
 
-        <RowMenu
-          onEdit={() => editExpense(expense)}
-          onDelete={() => setConfirm(true)}
-          editLabel="Edit expense"
-          deleteLabel="Delete expense"
-          title={expense.description}
-          subtitle={sub}
-        />
+        {mine && (
+          <RowMenu
+            onEdit={() => editExpense(expense)}
+            onDelete={() => setConfirm(true)}
+            editLabel="Edit expense"
+            deleteLabel="Delete expense"
+            title={expense.description}
+            subtitle={sub}
+          />
+        )}
       </div>
 
       <ConfirmSheet

@@ -146,7 +146,7 @@ export default function ShopModePage() {
       <div className="sticky top-16 z-20 glass px-5 pb-3 pt-2">
         <Card tone={stats.over ? 'blush' : 'butter'} pad={false} className="px-4 pb-4 pt-3.5">
           <div className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-white/70 text-[22px]">
+            <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-white/70 dark:bg-white/10 text-[22px]">
               {list.emoji}
             </span>
 
@@ -222,7 +222,7 @@ export default function ShopModePage() {
                 pad={false}
                 className="mb-2 flex items-center gap-2.5 px-3.5 py-2.5"
               >
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/70">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/70 dark:bg-white/10">
                   <AisleIcon size={15} strokeWidth={2.2} style={{ color: aisle.tint }} />
                 </span>
                 <span className="newq  text-ink min-w-0 flex-1 truncate text-[13.5px]">{aisle.label}</span>

@@ -33,6 +33,7 @@ import { useToast } from '@/components/ui/Toast';
 import { categoryOf } from '@/lib/categories';
 import { money, firstName, splitAmount, CURRENCIES } from '@/lib/format';
 import { isInvolved, shareOf } from '@/lib/balances';
+import { canEditExpense } from '@/lib/permissions';
 import FxNote from '@/components/ui/FxNote';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -159,8 +160,11 @@ export default function DashboardPage() {
   const tiles = [
     { id: 'add', label: 'Add', icon: Plus, tone: 'dark', onClick: () => openExpense() },
     { id: 'settle', label: 'Settle', icon: Wallet, onClick: () => openSettle() },
-    { id: 'list', label: 'List', icon: ShoppingBasket, href: '/lists?new=1' },
-    { id: 'group', label: 'Group', icon: UsersRound, href: '/groups?new=1' },
+    /* The section, not its create form. `?new=1` opened a sheet on arrival,
+       which is the wrong default for a nav tile — you cannot get to the list
+       without dismissing something you did not ask for. */
+    { id: 'list', label: 'List', icon: ShoppingBasket, href: '/lists' },
+    { id: 'group', label: 'Group', icon: UsersRound, href: '/groups' },
   ];
 
   return (
@@ -169,7 +173,7 @@ export default function DashboardPage() {
         {/* --------------------------------------------- hero */}
         <Section delay={0.04}>
           <Card tone="grape" pad={false} className="px-5 pb-5 pt-6">
-            <p className="newq text-[11.5px] uppercase tracking-[0.09em] text-ink-3">
+            <p className="newq text-[11.5px] uppercase tracking-[0.09em] text-ink-3 dark:text-ink-2">
               {settledNet ? 'All settled' : overview.net > 0 ? 'You are owed' : 'You owe'}
             </p>
 
@@ -183,7 +187,7 @@ export default function DashboardPage() {
               <span className="mr-1.5">{heroSymbol}</span>
               <span className="small">
                 {heroWhole}
-                {heroCents && <span className="text-ink-3">{heroCents}</span>}
+                {heroCents && <span className="text-ink-3 dark:text-ink-2">{heroCents}</span>}
               </span>
             </p>
 
@@ -192,7 +196,7 @@ export default function DashboardPage() {
             {/* Two white discs on the pastel, the way the reference splits a
                 balance into its two directions. */}
             <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <div className="rounded-[18px] bg-white/70 px-4 py-3">
+              <div className="rounded-[18px] bg-white/70 dark:bg-white/10 px-4 py-3">
                 <span className="flex items-center gap-1.5">
                   <ArrowDownLeft size={13} strokeWidth={2.5} className="text-pos" />
                   <span className="newq text-[11.5px]">Owed to you</span>
@@ -201,7 +205,7 @@ export default function DashboardPage() {
                   {money(overview.owed, currency)}
                 </p>
               </div>
-              <div className="rounded-[18px] bg-white/70 px-4 py-3">
+              <div className="rounded-[18px] bg-white/70 dark:bg-white/10 px-4 py-3">
                 <span className="flex items-center gap-1.5">
                   <ArrowUpRight size={13} strokeWidth={2.5} className="text-neg" />
                   <span className="newq text-[11.5px]">You owe</span>
@@ -268,6 +272,8 @@ export default function DashboardPage() {
                 // Exact figures for a single row stay in the currency it was
                 // recorded in; only the aggregates above get converted.
                 const own = e.currency || currency;
+                const mine = canEditExpense(e, me.id);
+                const canSettle = !settled && share.net < 0;
 
                 return (
                   <FieldRow
@@ -285,23 +291,30 @@ export default function DashboardPage() {
                             Paid
                           </Badge>
                         )}
+                        {/* Edit and delete are the author's; settling is not,
+                            so a non-author keeps that item and loses the rest.
+                            With neither, the menu would be empty — so it goes. */}
+                        {(mine || canSettle) && (
                         <RowMenu
-                          onEdit={() => editExpense(e)}
-                          onDelete={() =>
-                            ask({
-                              title: 'Delete this bill?',
-                              body: `“${e.description}” will be removed for everyone it was split with.`,
-                              confirmLabel: 'Delete bill',
-                              action: () =>
-                                run(() => deleteExpense(e.id), 'Could not delete the bill'),
-                            })
+                          onEdit={mine ? () => editExpense(e) : undefined}
+                          onDelete={
+                            mine
+                              ? () =>
+                                  ask({
+                                    title: 'Delete this bill?',
+                                    body: `“${e.description}” will be removed for everyone it was split with.`,
+                                    confirmLabel: 'Delete bill',
+                                    action: () =>
+                                      run(() => deleteExpense(e.id), 'Could not delete the bill'),
+                                  })
+                              : undefined
                           }
                           editLabel="Edit bill"
                           deleteLabel="Delete bill"
                           title={e.description}
                           subtitle={`${money(e.amount, own)} · split ${ways} ${ways === 1 ? 'way' : 'ways'}`}
                           extra={
-                            !settled && share.net < 0 ? (
+                            canSettle ? (
                               <button
                                 type="button"
                                 onClick={() => openSettle(payTargetOf(e))}
@@ -314,6 +327,7 @@ export default function DashboardPage() {
                             ) : null
                           }
                         />
+                        )}
                       </span>
                     }
                   />

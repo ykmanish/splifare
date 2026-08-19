@@ -240,17 +240,24 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
               <a
                 href={upiLink}
                 onClick={() => setHandedOff(true)}
+                /* Near-black works on the light canvas, but in dark mode
+                   `--panel` is within a few points of `--canvas`, so the whole
+                   button disappeared. Dark gets the lime fill instead — this is
+                   the one action on the sheet, so it should be the accent. */
                 className="flex w-full items-center gap-3 rounded-[18px] bg-panel px-4 py-3.5
-                  text-left tap active:scale-[0.99]"
+                  text-left tap active:scale-[0.99] dark:bg-brand"
               >
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-on-brand">
+                <span
+                  className="grid size-10 shrink-0 place-items-center rounded-full bg-brand
+                    text-on-brand dark:bg-on-brand dark:text-brand"
+                >
                   <ExternalLink size={18} strokeWidth={2.4} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="newq block text-[15px] text-white">
+                  <span className="newq block text-[15px] text-white dark:text-on-brand">
                     Pay {money(total, currency)} by UPI
                   </span>
-                  <span className="newq block truncate text-[12px] text-on-panel-2">
+                  <span className="newq block truncate text-[12px] text-on-panel-2 dark:text-on-brand/70">
                     Opens your UPI app · {other?.upiId}
                   </span>
                 </span>

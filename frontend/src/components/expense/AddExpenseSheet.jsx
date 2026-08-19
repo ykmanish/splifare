@@ -2,11 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import { Lock, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import StatusSheet from '@/components/ui/StatusSheet';
 import Button from '@/components/ui/Button';
-import { GroupLabel, IconCircle, ListGroup, SheetHeader } from '@/components/ui/Blocks';
+import {
+  FieldRow,
+  GroupLabel,
+  IconCircle,
+  ListGroup,
+  PersonRow,
+  SheetHeader,
+  StatusPill,
+} from '@/components/ui/Blocks';
+import { Card } from '@/components/ui/Bits';
 import { AmountInput, Input, Textarea } from '@/components/ui/Field';
 import Picker from '@/components/ui/Picker';
 import DatePicker from '@/components/ui/DatePicker';
@@ -17,8 +26,9 @@ import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { haptics } from '@/lib/haptics';
 import { readExpenseDraft, writeExpenseDraft, clearExpenseDraft } from '@/lib/draft';
+import { canEditExpense } from '@/lib/permissions';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
-import { firstName, CURRENCIES } from '@/lib/format';
+import { firstName, dayLabel, money, CURRENCIES } from '@/lib/format';
 import { rateLabel } from '@/lib/fx';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -105,8 +115,18 @@ function initialForm({ editing, prefill, groups, me }) {
 }
 
 export default function AddExpenseSheet({ open, onClose, prefill = {}, editing = null }) {
-  const { me, people, splitPool, groups, currency, convert, addExpense, updateExpense, deleteExpense } =
-    useApp();
+  const {
+    me,
+    people,
+    personById,
+    splitPool,
+    groups,
+    currency,
+    convert,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+  } = useApp();
   const { toast } = useToast();
 
   const [amount, setAmount] = useState('');
@@ -403,6 +423,106 @@ export default function AddExpenseSheet({ open, onClose, prefill = {}, editing =
   }
 
   const payer = people.find((p) => p.id === payerId);
+
+  /*
+   * Someone else's expense opens as a record, not a form. Everyone on a split
+   * is entitled to see how it was worked out; only its author may change it,
+   * which the server enforces independently.
+   */
+  if (editing && !canEditExpense(editing, me?.id)) {
+    const own = editing.currency || currency;
+    const author = personById(editing.createdBy);
+    const paidRows = (editing.paidBy || []).map((r) => ({
+      person: personById(r.userId),
+      amount: r.amount,
+    }));
+    const splitRows = (editing.splits || []).map((r) => ({
+      person: personById(r.userId),
+      amount: r.amount,
+    }));
+
+    return (
+      <Sheet open={open} onClose={onClose} size="lg">
+        <div className="space-y-6">
+          <SheetHeader
+            title={editing.description}
+            subtitle={`${money(editing.amount, own)} · ${dayLabel(editing.date)}`}
+          />
+
+          <StatusPill tone="blue" icon={Lock}>
+            Only {author?.id === me?.id ? 'you' : firstName(author?.name || 'whoever added it')} can
+            change this
+          </StatusPill>
+
+          <div>
+            <GroupLabel>Paid by</GroupLabel>
+            <ListGroup>
+              {paidRows.map((r) => (
+                <PersonRow
+                  key={`paid-${r.person.id}`}
+                  person={r.person}
+                  name={r.person.id === me?.id ? 'You' : r.person.name}
+                  trailing={
+                    <span className="num shrink-0 text-[15px] font-medium text-ink">
+                      {money(r.amount, own)}
+                    </span>
+                  }
+                />
+              ))}
+            </ListGroup>
+          </div>
+
+          <div>
+            <GroupLabel action={<Hint>{splitRows.length} people</Hint>}>Split between</GroupLabel>
+            <ListGroup>
+              {splitRows.map((r) => (
+                <PersonRow
+                  key={`split-${r.person.id}`}
+                  person={r.person}
+                  name={r.person.id === me?.id ? 'You' : r.person.name}
+                  trailing={
+                    <span className="num shrink-0 text-[15px] font-medium text-ink">
+                      {money(r.amount, own)}
+                    </span>
+                  }
+                />
+              ))}
+            </ListGroup>
+          </div>
+
+          {!!editing.items?.length && (
+            <div>
+              <GroupLabel>Items</GroupLabel>
+              <ListGroup>
+                {editing.items.map((item) => (
+                  <FieldRow
+                    key={item.id}
+                    label={item.name}
+                    value={money(item.price, own)}
+                  />
+                ))}
+              </ListGroup>
+            </div>
+          )}
+
+          {editing.notes && (
+            <div>
+              <GroupLabel>Note</GroupLabel>
+              <Card tone="soft">
+                <p className="newq whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
+                  {editing.notes}
+                </p>
+              </Card>
+            </div>
+          )}
+
+          <Button variant="soft" size="md" block onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </Sheet>
+    );
+  }
 
   return (
     <>

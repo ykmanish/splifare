@@ -1,5 +1,6 @@
 const { Notification, Activity } = require('../models');
 const { sendPush } = require('./push');
+const { emitSync, emitNotification } = require('../realtime');
 
 /** Where a notification of this shape should open in the app. */
 function routeFor(type, entityType, entityId) {
@@ -26,6 +27,21 @@ async function notify({ recipients, actor, type, title, body = '', entityType = 
     unique.map((user) => ({ user, actor, type, title, body, entityType, entityId })),
   );
 
+  /*
+     * Three channels, deliberately: the socket updates an open app instantly,
+     * the web push reaches a closed one, and the row itself is the durable
+     * record either can be reconciled against.
+     */
+  emitNotification(unique, {
+    id: String(rows[0]?._id || ''),
+    type,
+    title,
+    body,
+    entityType,
+    entityId,
+  });
+  emitSync(unique, ['notifications']);
+
   sendPush(unique, {
     title,
     body,
@@ -50,7 +66,7 @@ async function logActivity({
   entityType = null,
   entityId = null,
 }) {
-  return Activity.create({
+  const row = await Activity.create({
     audience: [...new Set(audience.map(String))],
     actor,
     type,
@@ -60,6 +76,10 @@ async function logActivity({
     entityType,
     entityId,
   });
+
+  emitSync(audience, ['activity']);
+
+  return row;
 }
 
 module.exports = { notify, logActivity, routeFor };

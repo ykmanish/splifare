@@ -16,6 +16,19 @@ const EMAIL_RE = /^\S+@\S+\.\S+$/;
  */
 const UPI_RE = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z]{2,32}$/;
 
+/**
+ * A handle people will read and type: letters, digits, underscore and dot,
+ * 3–20 characters, and it has to start with a letter or digit so a name cannot
+ * masquerade as punctuation.
+ */
+const USERNAME_RE = /^[a-z0-9][a-z0-9_.]{2,19}$/;
+
+/** Reserved so a handle cannot impersonate the product or a route. */
+const RESERVED = new Set([
+  'admin', 'splitta', 'support', 'help', 'root', 'system', 'api', 'settings',
+  'groups', 'friends', 'lists', 'activity', 'dashboard', 'share', 'login', 'signup',
+]);
+
 router.post(
   '/register',
   asyncHandler(async (req, res) => {
@@ -69,6 +82,30 @@ router.patch(
     const allowed = ['name', 'phone', 'currency', 'theme', 'avatarSeed', 'avatarStyle', 'avatarBg'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) req.user[key] = req.body[key];
+    }
+
+    if (req.body.username !== undefined) {
+      const raw = String(req.body.username).trim().toLowerCase().replace(/^@/, '');
+
+      // Empty clears it and falls back to the display name.
+      if (!raw) {
+        req.user.username = undefined;
+      } else {
+        if (!USERNAME_RE.test(raw)) {
+          throw new HttpError(
+            400,
+            'Usernames are 3–20 characters: letters, numbers, dots and underscores',
+          );
+        }
+        if (RESERVED.has(raw)) throw new HttpError(409, 'That username is reserved');
+
+        // Checked here for a clear message; the unique index is what actually
+        // guarantees it under a race.
+        const taken = await User.exists({ username: raw, _id: { $ne: req.user._id } });
+        if (taken) throw new HttpError(409, 'That username is already taken');
+
+        req.user.username = raw;
+      }
     }
 
     if (req.body.upiId !== undefined) {

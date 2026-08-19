@@ -4,6 +4,7 @@ const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { HttpError } = require('../middleware/error');
 const { notify, logActivity } = require('../utils/feed');
 const { normaliseCode } = require('../utils/codes');
+const { emitSync } = require('../realtime');
 const {
   visiblePeople,
   publicUser,
@@ -100,6 +101,8 @@ async function acceptRequest(doc, req) {
     entityId: String(otherId),
   });
 
+  emitSync([req.userId, String(otherId)], ['people', 'requests', 'activity']);
+
   return other;
 }
 
@@ -164,6 +167,8 @@ router.post(
       entityId: req.userId,
     });
 
+    emitSync([String(target._id), req.userId], ['requests']);
+
     res.status(201).json({ request: asRequest(doc, target) });
   }),
 );
@@ -199,6 +204,7 @@ router.post(
     doc.status = 'declined';
     doc.respondedAt = new Date();
     await doc.save();
+    emitSync([String(doc.from), String(doc.to)], ['requests']);
     res.json({ ok: true });
   }),
 );
@@ -208,7 +214,9 @@ router.delete(
   '/requests/:id',
   asyncHandler(async (req, res) => {
     const doc = await ownRequest(req.params.id, req.userId, 'from');
+    const pair = [String(doc.from), String(doc.to)];
     await doc.deleteOne();
+    emitSync(pair, ['requests']);
     res.json({ ok: true });
   }),
 );
@@ -230,6 +238,8 @@ router.delete(
 
     const doc = await requestBetween(req.userId, other);
     if (doc) await doc.deleteOne();
+
+    emitSync([req.userId, other], ['people', 'requests']);
 
     res.json({ ok: true });
   }),
