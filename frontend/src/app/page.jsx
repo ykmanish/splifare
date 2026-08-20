@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import Logo from '@/components/Logo';
 import Button from '@/components/ui/Button';
@@ -101,12 +102,24 @@ export default function LandingPage() {
   if (!ready || session) {
     return (
       <div className="grid min-h-dvh place-items-center bg-canvas">
+        {/*
+         * Deliberately identical to the app shell's own boot screen — same
+         * icon, same size, same float. A signed-in visit passes straight
+         * through this into that, and matching them means the icon never
+         * jumps or swaps as the redirect lands.
+         */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.45, ease: EASE }}
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <Logo size={40} />
+          <Image
+            src="/icon.png"
+            alt=""
+            width={72}
+            height={72}
+            priority
+            className="size-18 rounded-[22px]"
+          />
         </motion.div>
       </div>
     );
