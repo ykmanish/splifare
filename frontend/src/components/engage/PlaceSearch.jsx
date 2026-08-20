@@ -77,16 +77,16 @@ export default function PlaceSearch({ value, onPick, onClear, onTypedName }) {
       <div>
         <Label>Location</Label>
         <div className="overflow-hidden rounded-[20px] bg-surface-2">
-          {mapUrl && (
-            <iframe
-              title={`Map of ${value.name || 'the place'}`}
-              src={mapUrl}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-              className="h-40 w-full border-0"
-            />
-          )}
+          {/*
+           * Address above the map, deliberately.
+           *
+           * The Maps Embed API is a separately-enabled product, and a key that
+           * is fine for Places search can still be refused here — in which
+           * case Google renders a wall of explanatory text *inside* the frame,
+           * which is cross-origin and cannot be styled or suppressed. Putting
+           * the pin first means that failure costs a scruffy thumbnail rather
+           * than burying the address and the buttons that still work.
+           */}
           <div className="flex items-start gap-2.5 px-4 py-3">
             <MapPin size={15} strokeWidth={2.4} className="mt-0.5 shrink-0 text-brand" />
             <div className="min-w-0 flex-1">
@@ -106,7 +106,36 @@ export default function PlaceSearch({ value, onPick, onClear, onTypedName }) {
               <X size={14} strokeWidth={2.5} />
             </button>
           </div>
+
+          {mapUrl && (
+            <div className="relative h-36 w-full overflow-hidden border-t border-line">
+              <iframe
+                title={`Map of ${value.name || 'the place'}`}
+                src={mapUrl}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+                /* Deprecated, but still honoured everywhere and the only lever
+                   that stops a cross-origin error page growing its own
+                   scrollbar inside the card. */
+                scrolling="no"
+                className="absolute inset-0 size-full border-0"
+              />
+            </div>
+          )}
         </div>
+
+        {/*
+         * Only the person who owns the key can act on this, so it stays out of
+         * the production bundle rather than telling end users to go and edit a
+         * Cloud console they have never heard of.
+         */}
+        {mapUrl && process.env.NODE_ENV === 'development' && (
+          <p className="newq mt-1.5 px-1 text-[11px] leading-snug text-ink-3">
+            No map above? Enable <span className="text-ink">Maps Embed API</span> for this key —
+            it is a separate product from Places API.
+          </p>
+        )}
       </div>
     );
   }

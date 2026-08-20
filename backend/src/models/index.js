@@ -215,7 +215,15 @@ const savedPlaceSchema = new Schema(
     lat: { type: Number, default: null, min: -90, max: 90 },
     lng: { type: Number, default: null, min: -180, max: 180 },
     mapsUrl: { type: String, default: '', trim: true, maxlength: 600 },
-    /** How often a bill actually started here — the sort key for the list. */
+    /*
+     * Left in place, no longer written.
+     *
+     * These backed a "times used" counter that measured the expense sheet
+     * opening rather than a bill being saved, so the figure was wrong and the
+     * UI ranking built on it was wrong with it. The fields stay because rows
+     * already carry values and dropping them buys nothing; nothing reads or
+     * increments them any more.
+     */
     useCount: { type: Number, default: 0 },
     lastUsedAt: { type: Date, default: null },
     createdBy: ref('User'),

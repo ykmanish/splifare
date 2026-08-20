@@ -283,11 +283,14 @@ export default function EngagePage() {
 
         {/* ------------------------------------------------------ places */}
         {view.places.length > 0 && (
-          <Section title="Your regular spots" delay={0.12}>
+          /* "Saved", not "regular" — the usage counter that word implied is
+             gone, and this is now simply the most recently touched. */
+          <Section title="Saved places" delay={0.12}>
             <div className="-mx-5 overflow-x-auto px-5 no-scrollbar">
               <div className="flex gap-2 pb-1">
                 {view.places.slice(0, 10).map((p) => {
                   const kind = placeKind(p.kind);
+                  const group = groupById[p.groupId];
                   return (
                     <div
                       key={p.id}
@@ -299,7 +302,9 @@ export default function EngagePage() {
                       <span className="newq line-clamp-2 text-[13px] leading-snug text-ink">
                         {p.name}
                       </span>
-                      {p.useCount > 0 && <Badge tone="neutral">{p.useCount}x</Badge>}
+                      <span className="newq mt-auto truncate text-[11px] text-ink-3">
+                        {group?.name || kind.label}
+                      </span>
                     </div>
                   );
                 })}

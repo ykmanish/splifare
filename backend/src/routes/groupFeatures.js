@@ -216,7 +216,7 @@ router.get(
           .limit(PAGE),
         RecurringExpense.find({ group: group._id }).sort({ active: -1, nextDate: 1 }),
         SplitRequest.find({ group: group._id }).sort({ createdAt: -1 }).limit(60),
-        SavedPlace.find({ group: group._id }).sort({ useCount: -1, updatedAt: -1 }).limit(60),
+        SavedPlace.find({ group: group._id }).sort({ updatedAt: -1 }).limit(60),
         GroupMemory.find({ group: group._id }).sort({ date: -1 }).limit(60),
         Expense.find({ group: group._id }).sort({ date: -1 }),
         Settlement.find({ group: group._id }),
@@ -632,16 +632,6 @@ router.patch(
     const place = await SavedPlace.findOne({ _id: req.params.pid, group: group._id });
     if (!place) throw new HttpError(404, 'Place not found');
 
-    /*
-     * `used` is the interesting write here: starting a bill from a place bumps
-     * its count, which is what floats the canteen everyone actually goes to
-     * above the restaurant somebody saved once.
-     */
-    if (req.body.used) {
-      place.useCount += 1;
-      place.lastUsedAt = new Date();
-      if (req.body.amount !== undefined) place.typicalAmount = optionalAmount(req.body.amount);
-    }
     if (req.body.name !== undefined) place.name = clean(req.body.name, 120);
     if (req.body.kind !== undefined) place.kind = clean(req.body.kind, 40);
     if (req.body.category !== undefined) place.category = clean(req.body.category, 40);
@@ -770,7 +760,7 @@ router.get(
         .limit(20),
       BadgeAward.find({ user: req.userId }).sort({ earnedAt: -1 }).limit(40),
       SavedPlace.find({ group: { $in: groupIds } })
-        .sort({ useCount: -1, updatedAt: -1 })
+        .sort({ updatedAt: -1 })
         .limit(12),
     ]);
 

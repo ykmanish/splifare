@@ -286,8 +286,6 @@ export const normSavedPlace = (p) =>
     lat: p.lat ?? null,
     lng: p.lng ?? null,
     mapsUrl: p.mapsUrl || '',
-    useCount: Number(p.useCount) || 0,
-    lastUsedAt: p.lastUsedAt || null,
     createdBy: id(p.createdBy),
     createdAt: p.createdAt,
   };

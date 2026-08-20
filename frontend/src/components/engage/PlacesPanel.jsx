@@ -2,12 +2,22 @@
 
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ExternalLink, MapPin, Navigation, Plus, Receipt, Star, Trash2 } from 'lucide-react';
+import {
+  ChevronRight,
+  ExternalLink,
+  MapPin,
+  Navigation,
+  Pencil,
+  Plus,
+  Receipt,
+  Trash2,
+} from 'lucide-react';
 import Sheet, { ConfirmSheet } from '@/components/ui/Sheet';
 import Button from '@/components/ui/Button';
 import Picker from '@/components/ui/Picker';
 import { Input } from '@/components/ui/Field';
-import { Badge, Card, EmptyState } from '@/components/ui/Bits';
+import { Card, EmptyState } from '@/components/ui/Bits';
+import { FieldRow, GroupLabel, ListGroup } from '@/components/ui/Blocks';
 import { api, normSavedPlace } from '@/lib/api';
 import { PLACE_KINDS, placeKind } from '@/lib/engage';
 import { directionsLink, embedMapUrl, hasLocation, placeLink } from '@/lib/maps';
@@ -40,15 +50,16 @@ function guessKind(label) {
 /**
  * Saved places and vendors.
  *
- * The list is sorted by how often a bill actually started from each entry, not
- * by when it was added. That single choice is what turns this from a bookmark
- * folder into a shortcut: after a fortnight the canteen everyone eats at sits
- * at the top and the restaurant somebody saved once sinks, without anyone
- * having to curate anything.
+ * Tapping a place opens its detail — map, address, directions, what you
+ * usually spend — with "start a bill from here" as the primary action from
+ * there. Going straight to the expense sheet was one tap faster and left
+ * nowhere to simply look a place up, which is most of why you saved it.
  *
- * Tapping a place opens the expense sheet with its name, category and typical
- * amount already filled — which is the whole feature. Saving a name you then
- * have to retype is not a saving.
+ * There was a "times used" counter ranking this list. It is gone, and
+ * deliberately not replaced with a fixed version: it counted the expense sheet
+ * *opening* rather than a bill being saved, so backing out still scored, and
+ * it was driving a visible ranking off a number nobody could check. A list you
+ * scan by name belongs in name order.
  */
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -260,22 +271,131 @@ function PlaceSheet({ open, onClose, groupId, currency, editing, onSaved, onDele
   );
 }
 
+/**
+ * Everything known about one place, before you commit to a bill.
+ *
+ * Tapping a card used to fire the expense sheet straight away, which made the
+ * list a one-trick shortcut — there was nowhere to simply *look* at a place,
+ * check the address, or get directions to it. Starting a bill is still the
+ * primary action here, it just is not the only one any more.
+ */
+function PlaceDetailSheet({ place, onClose, onStartBill, onEdit, currency }) {
+  if (!place) return null;
+
+  const kind = placeKind(place.kind);
+  const located = hasLocation(place);
+  const mapUrl = embedMapUrl(place);
+
+  return (
+    <Sheet
+      open={!!place}
+      onClose={onClose}
+      title={place.name}
+      subtitle={kind.label}
+      footer={
+        <Button size="lg" block icon={Receipt} onClick={() => onStartBill(place)}>
+          Start a bill from here
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        {mapUrl && (
+          <div className="relative h-44 w-full overflow-hidden rounded-[20px] bg-surface-2">
+            <iframe
+              title={`Map of ${place.name}`}
+              src={mapUrl}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+              scrolling="no"
+              className="absolute inset-0 size-full border-0"
+            />
+          </div>
+        )}
+
+        {place.address && (
+          <div className="flex items-start gap-2.5 rounded-[18px] bg-surface-2 px-4 py-3">
+            <MapPin size={15} strokeWidth={2.4} className="mt-0.5 shrink-0 text-brand" />
+            <p className="newq min-w-0 flex-1 text-[13px] leading-snug text-ink-2">
+              {place.address}
+            </p>
+          </div>
+        )}
+
+        {located && (
+          <div className="flex gap-2">
+            <Button
+              variant="soft"
+              icon={Navigation}
+              className="flex-1"
+              as="a"
+              href={directionsLink(place)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Directions
+            </Button>
+            <Button
+              variant="ghost"
+              icon={ExternalLink}
+              className="flex-1"
+              as="a"
+              href={placeLink(place)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in Maps
+            </Button>
+          </div>
+        )}
+
+        {place.note && (
+          <div>
+            <GroupLabel>Note</GroupLabel>
+            <Card tone="soft">
+              <p className="newq text-[13.5px] leading-relaxed text-ink">{place.note}</p>
+            </Card>
+          </div>
+        )}
+
+        {place.typicalAmount > 0 && (
+          <div>
+            <GroupLabel>Detail</GroupLabel>
+            <ListGroup>
+              <FieldRow
+                label="Typical spend"
+                value={money(place.typicalAmount, place.currency || currency)}
+              />
+            </ListGroup>
+          </div>
+        )}
+
+        <Button block variant="ghost" icon={Pencil} onClick={() => onEdit(place)}>
+          Edit this place
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
 export default function PlacesPanel({ groupId, places, currency, onChange, onOpenExpense, loading }) {
   const [sheet, setSheet] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [detail, setDetail] = useState(null);
 
-  /* Most-used first, then most recently touched. */
+  /*
+   * Alphabetical.
+   *
+   * This used to rank by a "times used" counter, which turned out to measure
+   * the wrong thing: it incremented when the expense sheet *opened*, so
+   * changing your mind still counted, and the order was quietly wrong. A list
+   * you scan by name is better served by being in name order anyway — it does
+   * not reshuffle under you, and you can find somewhere without hunting.
+   */
   const sorted = useMemo(
-    () =>
-      [...places].sort(
-        (a, b) =>
-          b.useCount - a.useCount ||
-          new Date(b.lastUsedAt || b.createdAt) - new Date(a.lastUsedAt || a.createdAt),
-      ),
+    () => [...places].sort((a, b) => a.name.localeCompare(b.name)),
     [places],
   );
-
-  const regulars = sorted.filter((p) => p.useCount >= 3);
 
   function start(place) {
     onOpenExpense({
@@ -284,12 +404,6 @@ export default function PlacesPanel({ groupId, places, currency, onChange, onOpe
       category: place.category,
       amount: place.typicalAmount || undefined,
     });
-    /* Fire-and-forget: the count is a sort hint, and a failed bump must not
-       interrupt the thing the user actually pressed. */
-    api
-      .updateSavedPlace(groupId, place.id, { used: true })
-      .then(({ place: updated }) => onChange.updated(normSavedPlace(updated)))
-      .catch(() => {});
   }
 
   function open(place = null) {
@@ -304,9 +418,9 @@ export default function PlacesPanel({ groupId, places, currency, onChange, onOpe
       </Button>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[92px] animate-pulse rounded-[20px] bg-surface-2" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-[76px] animate-pulse rounded-[20px] bg-surface-2" />
           ))}
         </div>
       ) : !places.length ? (
@@ -314,95 +428,82 @@ export default function PlacesPanel({ groupId, places, currency, onChange, onOpe
           <EmptyState
             icon={MapPin}
             title="No saved places"
-            body="Save the places you keep spending at. Tapping one starts a bill with its name and usual amount already in."
+            body="Save the places you keep spending at, then start a bill from one in two taps — name, category and usual amount already filled."
           />
         </Card>
       ) : (
         <>
-          {regulars.length > 0 && (
-            <p className="newq px-1 text-[11.5px] uppercase tracking-[0.08em] text-ink-3">
-              Your regulars
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
+          {/*
+           * Full-width rows rather than a two-column grid.
+           *
+           * The tiles were losing the thing that makes a saved place worth
+           * having — its address — to a `line-clamp-1` about forty characters
+           * too short. A row has the width to show where somewhere actually
+           * is, which is the difference between a list of names and a list of
+           * places.
+           */}
+          <div className="space-y-2">
             <AnimatePresence initial={false}>
               {sorted.map((place, i) => {
                 const kind = placeKind(place.kind);
+                const located = hasLocation(place);
                 return (
                   <motion.div
                     key={place.id}
                     layout
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                     transition={{ duration: 0.26, delay: Math.min(i * 0.02, 0.2), ease: EASE }}
                     className="relative"
                   >
                     <button
                       type="button"
-                      onClick={() => start(place)}
-                      className="flex h-full w-full flex-col gap-1.5 rounded-[20px] bg-surface px-3.5 py-3.5 text-left tap active:scale-[0.98]"
+                      onClick={() => setDetail(place)}
+                      className="flex w-full items-center gap-3 rounded-[20px] bg-surface px-3.5 py-3
+                        text-left tap active:scale-[0.99]"
                     >
-                      <span className="flex items-start justify-between gap-2">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-[13px] bg-surface-2 text-[17px]">
-                          {kind.emoji}
-                        </span>
-                        {place.useCount >= 3 && (
-                          <Star size={12} strokeWidth={2.6} className="mt-1 shrink-0 text-brand" />
-                        )}
+                      <span className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-surface-2 text-[19px]">
+                        {kind.emoji}
                       </span>
 
-                      <span className="newq mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-ink">
-                        {place.name}
-                      </span>
-
-                      {place.address && (
-                        <span className="newq -mt-0.5 line-clamp-1 text-[11px] text-ink-3">
-                          {place.address}
+                      <span className="min-w-0 flex-1">
+                        <span className="newq block truncate text-[14.5px] text-ink">
+                          {place.name}
                         </span>
-                      )}
 
-                      <span className="mt-auto flex flex-wrap items-center gap-1 pr-8">
+                        <span className="newq mt-0.5 block truncate text-[11.5px] text-ink-3">
+                          {place.address || kind.label}
+                        </span>
+
                         {place.typicalAmount > 0 && (
-                          <span className="num text-[11.5px] text-ink-3">
+                          <span className="num mt-1 block text-[11.5px] text-ink-3">
                             ~{money(place.typicalAmount, place.currency || currency, { compact: true })}
                           </span>
                         )}
-                        {place.useCount > 0 && (
-                          <Badge tone="neutral">{place.useCount}x</Badge>
-                        )}
                       </span>
+
+                      {/* Room is kept for the directions button whether or not
+                          this place has a pin, so names do not shift about
+                          between rows. */}
+                      <span className="w-9 shrink-0" />
+                      <ChevronRight size={16} strokeWidth={2.4} className="shrink-0 text-ink-3" />
                     </button>
 
-                    {/* Always visible, not hover-revealed: this is a phone
-                        app first, and a control that only appears on hover is
-                        a control that does not exist on a touchscreen. */}
-                    <button
-                      type="button"
-                      aria-label={`Edit ${place.name}`}
-                      onClick={() => open(place)}
-                      className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-full
-                        text-ink-3 tap hover:bg-surface-2 hover:text-ink"
-                    >
-                      <span className="text-[15px] leading-none">···</span>
-                    </button>
-
-                    {/* Directions without opening anything first. Sitting on
-                        the card rather than behind the edit sheet is the whole
-                        difference between "saved" and "useful when you are
+                    {/* One tap to navigate, without opening anything first —
+                        the difference between "saved" and "useful when you are
                         standing outside trying to find it". */}
-                    {hasLocation(place) && (
+                    {located && (
                       <a
                         href={directionsLink(place)}
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Directions to ${place.name}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute bottom-2 right-2 grid size-8 place-items-center rounded-full
-                          bg-brand-soft text-ink tap active:scale-90"
+                        className="absolute right-9 top-1/2 grid size-9 -translate-y-1/2 place-items-center
+                          rounded-full bg-brand-soft text-ink tap active:scale-90"
                       >
-                        <Navigation size={13} strokeWidth={2.6} />
+                        <Navigation size={14} strokeWidth={2.6} />
                       </a>
                     )}
                   </motion.div>
@@ -410,13 +511,22 @@ export default function PlacesPanel({ groupId, places, currency, onChange, onOpe
               })}
             </AnimatePresence>
           </div>
-
-          <p className="newq flex items-center gap-1.5 px-1 text-[11.5px] text-ink-3">
-            <Receipt size={11} strokeWidth={2.4} />
-            Tap a place to start a bill from it
-          </p>
         </>
       )}
+
+      <PlaceDetailSheet
+        place={detail}
+        currency={currency}
+        onClose={() => setDetail(null)}
+        onStartBill={(place) => {
+          setDetail(null);
+          start(place);
+        }}
+        onEdit={(place) => {
+          setDetail(null);
+          open(place);
+        }}
+      />
 
       <PlaceSheet
         open={sheet}
