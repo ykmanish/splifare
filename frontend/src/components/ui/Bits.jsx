@@ -68,9 +68,19 @@ export function Card({
   children,
   ...rest
 }) {
+  /*
+   * An unknown tone falls back rather than interpolating `undefined` into the
+   * class list. That failure mode is nastier than it sounds: the card loses
+   * its background but keeps whatever ink the caller paired with it, so
+   * `tone="brand"` (there is no such tone — the lime one is `lime`) rendered
+   * near-black text on no background. Legible over the light canvas by luck,
+   * invisible in dark mode.
+   */
+  const fill = TONES[tone] || TONES.white;
+
   return (
     <Tag
-      className={`relative overflow-hidden rounded-[24px] ${TONES[tone]} ${blob ? 'blob' : ''}
+      className={`relative overflow-hidden rounded-[24px] ${fill} ${blob ? 'blob' : ''}
         ${pad ? 'p-5' : ''} ${className}`}
       {...rest}
     >

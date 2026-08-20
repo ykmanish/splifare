@@ -508,7 +508,7 @@ export default function GamesPanel({ group, members, me, nets, currency, onSettl
             exit={{ opacity: 0, y: -6 }}
             transition={{ type: 'spring', damping: 24, stiffness: 320 }}
           >
-            <Card tone="brand" className="flex items-center gap-4">
+            <Card tone="lime" className="flex items-center gap-4">
               <Avatar person={winner} size="lg" ring />
               <div className="min-w-0 flex-1">
                 <p className="newq flex items-center gap-1.5 text-[11.5px] uppercase tracking-[0.08em] text-on-brand/70">

@@ -214,7 +214,7 @@ export default function EngageTab({
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -8, height: 0 }}
           >
-            <Card tone="brand" pad={false} className="flex items-start gap-3 p-4">
+            <Card tone="lime" pad={false} className="flex items-start gap-3 p-4">
               <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-on-brand/15 text-on-brand">
                 <Zap size={15} strokeWidth={2.5} />
               </span>
