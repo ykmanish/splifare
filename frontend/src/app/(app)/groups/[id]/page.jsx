@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -48,6 +48,7 @@ import FxNote from '@/components/ui/FxNote';
 import MemberSheet from '@/components/groups/MemberSheet';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
+import EngageTab from '@/components/engage/EngageTab';
 import { buildLedger, balancesFor, netByMember, simplify, shareOf } from '@/lib/balances';
 import { canEditExpense } from '@/lib/permissions';
 import { money, firstName, dayLabel, splitAmount } from '@/lib/format';
@@ -145,6 +146,7 @@ function ExpenseRow({ expense, me, personById, onView, onEdit, onDelete }) {
 export default function GroupDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { openExpense, openSettle, viewExpense, editExpense } = useUI();
   const {
@@ -163,9 +165,10 @@ export default function GroupDetailPage() {
     deleteExpense,
     deleteList,
     personById,
+    refresh,
   } = useApp();
 
-  const [tab, setTab] = useState('expenses');
+  const [tab, setTab] = useState(searchParams.get('tab') === 'engage' ? 'engage' : 'expenses');
   const [managing, setManaging] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -227,6 +230,7 @@ export default function GroupDetailPage() {
   const addableFriends = friends.filter((p) => p && !memberIdSet.has(p.id));
 
   const groupLists = lists.filter((l) => l.groupId === group.id);
+  const groupSettlements = settlements.filter((s) => s.groupId === group.id);
   const { mine, nets, transfers, groupExpenses, total } = data;
   const settled = Math.abs(mine.net) < 0.005;
   const netParts = splitAmount(mine.net, currency);
@@ -236,6 +240,7 @@ export default function GroupDetailPage() {
     (acc[key] = acc[key] || []).push(e);
     return acc;
   }, {});
+
 
   /* Seed the drafts on open so the sheet never shows stale values. */
   function openSettings() {
@@ -506,6 +511,7 @@ export default function GroupDetailPage() {
               options={[
                 { id: 'expenses', label: `Expenses (${groupExpenses.length})` },
                 { id: 'balances', label: 'Balances' },
+                { id: 'engage', label: 'Engage' },
               ]}
               value={tab}
               onChange={setTab}
@@ -552,7 +558,7 @@ export default function GroupDetailPage() {
                   />
                 </Card>
               )
-            ) : (
+            ) : tab === 'balances' ? (
               <div className="space-y-7">
                 {/* -------------------------------------- per member */}
                 <div>
@@ -644,6 +650,22 @@ export default function GroupDetailPage() {
                   )}
                 </div>
               </div>
+            ) : (
+              <EngageTab
+                group={group}
+                members={members}
+                me={me}
+                personById={personById}
+                currency={currency}
+                convert={convert}
+                expenses={groupExpenses}
+                settlements={groupSettlements}
+                nets={nets}
+                onOpenExpense={openExpense}
+                onViewExpense={viewExpense}
+                onSettle={openSettle}
+                onExpensesChanged={() => refresh(['expenses', 'activity'])}
+              />
             )}
           </Section>
         </div>

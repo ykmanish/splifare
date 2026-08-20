@@ -37,6 +37,7 @@ import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { haptics } from '@/lib/haptics';
 import { readExpenseDraft, writeExpenseDraft, clearExpenseDraft } from '@/lib/draft';
+import ChatThread from '@/components/engage/ChatThread';
 import { canEditExpense } from '@/lib/permissions';
 import { categoryOf } from '@/lib/categories';
 import { computeSplits, defaultValuesFor } from '@/lib/split';
@@ -753,6 +754,28 @@ export default function AddExpenseSheet({
                   {editing.notes}
                 </p>
               </Card>
+            </div>
+          )}
+
+          {/*
+           * The bill's own thread.
+           *
+           * "Why is this ₹400?" belongs against the ₹400, not in the group
+           * room three screens away where nobody can tell which bill is being
+           * argued about. Only for group expenses — a two-person split already
+           * has a chat, and it is called a text message.
+           */}
+          {group && (
+            <div>
+              <GroupLabel>Discussion</GroupLabel>
+              <ChatThread
+                groupId={group.id}
+                expenseId={editing.id}
+                me={me}
+                personById={personById}
+                height="max-h-[36vh]"
+                emptyBody="Ask about this bill here and everyone on it gets a notification."
+              />
             </div>
           )}
 

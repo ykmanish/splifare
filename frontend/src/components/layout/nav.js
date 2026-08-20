@@ -1,11 +1,11 @@
-import { Home, Users, UserRound, ShoppingBasket, Activity, CircleUser } from 'lucide-react';
+import { Home, Users, UserRound, ShoppingBasket, Sparkles, CircleUser } from 'lucide-react';
 
 export const NAV = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/groups', label: 'Groups', icon: Users },
   { href: '/friends', label: 'Friends', icon: UserRound },
   { href: '/lists', label: 'Lists', icon: ShoppingBasket },
-  { href: '/activity', label: 'Activity', icon: Activity },
+  { href: '/engage', label: 'Engage', icon: Sparkles },
   { href: '/settings', label: 'Profile', icon: CircleUser },
 ];
 

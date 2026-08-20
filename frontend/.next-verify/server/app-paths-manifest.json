@@ -1,0 +1,21 @@
+{
+  "/(app)/activity/page": "app/(app)/activity/page.js",
+  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
+  "/(app)/engage/page": "app/(app)/engage/page.js",
+  "/(app)/friends/[id]/page": "app/(app)/friends/[id]/page.js",
+  "/(app)/friends/page": "app/(app)/friends/page.js",
+  "/(app)/groups/[id]/page": "app/(app)/groups/[id]/page.js",
+  "/(app)/groups/page": "app/(app)/groups/page.js",
+  "/(app)/lists/[id]/page": "app/(app)/lists/[id]/page.js",
+  "/(app)/lists/[id]/shop/page": "app/(app)/lists/[id]/shop/page.js",
+  "/(app)/lists/page": "app/(app)/lists/page.js",
+  "/(app)/settings/page": "app/(app)/settings/page.js",
+  "/(app)/share/page": "app/(app)/share/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(auth)/signup/page": "app/(auth)/signup/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/page": "app/page.js"
+}

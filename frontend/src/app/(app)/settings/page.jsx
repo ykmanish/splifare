@@ -25,6 +25,7 @@ import {
   MessageSquare,
   Trash2,
   Loader2,
+  Activity,
 } from 'lucide-react';
 import Page from '@/components/layout/Page';
 import Button from '@/components/ui/Button';
@@ -450,6 +451,13 @@ export default function SettingsPage() {
         {/* ---------------------------------------------- app */}
         <Section title="App" delay={0.12}>
           <ListGroup>
+            <FieldRow
+              icon={Activity}
+              label="Activity"
+              sublabel="Open your full activity feed"
+              href="/activity"
+              chevron
+            />
             <FieldRow
               icon={RotateCcw}
               label="Sync now"

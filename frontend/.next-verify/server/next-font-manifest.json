@@ -1,0 +1,23 @@
+{
+  "app": {
+    "[project]/src/app/(app)/activity/page": [],
+    "[project]/src/app/(app)/dashboard/page": [],
+    "[project]/src/app/(app)/engage/page": [],
+    "[project]/src/app/(app)/friends/[id]/page": [],
+    "[project]/src/app/(app)/friends/page": [],
+    "[project]/src/app/(app)/groups/[id]/page": [],
+    "[project]/src/app/(app)/groups/page": [],
+    "[project]/src/app/(app)/lists/[id]/page": [],
+    "[project]/src/app/(app)/lists/[id]/shop/page": [],
+    "[project]/src/app/(app)/lists/page": [],
+    "[project]/src/app/(app)/settings/page": [],
+    "[project]/src/app/(app)/share/page": [],
+    "[project]/src/app/(auth)/login/page": [],
+    "[project]/src/app/(auth)/signup/page": [],
+    "[project]/src/app/_not-found/page": [],
+    "[project]/src/app/page": []
+  },
+  "appUsingSizeAdjust": false,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

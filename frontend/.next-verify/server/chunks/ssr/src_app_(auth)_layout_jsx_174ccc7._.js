@@ -1,0 +1,3 @@
+module.exports=[45891,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(50944),e=a.i(29708);a.s(["default",0,function({children:a}){let{ready:f,session:g}=(0,e.useApp)(),h=(0,d.useRouter)();return(0,c.useEffect)(()=>{f&&g&&h.replace("/dashboard")},[f,g,h]),(0,b.jsx)("div",{className:"min-h-dvh bg-canvas",children:(0,b.jsx)("div",{className:"phone flex min-h-dvh flex-col pb-safe",children:(0,b.jsx)("main",{className:"flex-1 px-5 pb-12 pt-18",children:a})})})}])}];
+
+//# sourceMappingURL=src_app_%28auth%29_layout_jsx_174ccc7._.js.map

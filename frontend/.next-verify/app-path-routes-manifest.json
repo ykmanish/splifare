@@ -1,0 +1,21 @@
+{
+  "/(app)/activity/page": "/activity",
+  "/(app)/dashboard/page": "/dashboard",
+  "/(app)/engage/page": "/engage",
+  "/(app)/friends/[id]/page": "/friends/[id]",
+  "/(app)/friends/page": "/friends",
+  "/(app)/groups/[id]/page": "/groups/[id]",
+  "/(app)/groups/page": "/groups",
+  "/(app)/lists/[id]/page": "/lists/[id]",
+  "/(app)/lists/[id]/shop/page": "/lists/[id]/shop",
+  "/(app)/lists/page": "/lists",
+  "/(app)/settings/page": "/settings",
+  "/(app)/share/page": "/share",
+  "/(auth)/login/page": "/login",
+  "/(auth)/signup/page": "/signup",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/favicon.ico/route": "/favicon.ico",
+  "/manifest.webmanifest/route": "/manifest.webmanifest",
+  "/page": "/"
+}

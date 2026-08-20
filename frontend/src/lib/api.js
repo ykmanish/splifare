@@ -143,6 +143,7 @@ export const normExpense = (e) =>
     })),
     createdBy: id(e.createdBy),
     listId: id(e.list),
+    recurringId: id(e.recurring),
     createdAt: e.createdAt,
   };
 
@@ -222,6 +223,89 @@ export const normActivity = (a) =>
     createdAt: a.createdAt,
   };
 
+export const normGroupMessage = (m) =>
+  m && {
+    id: id(m),
+    groupId: id(m.group),
+    expenseId: id(m.expense),
+    authorId: id(m.author),
+    text: m.text || '',
+    reactions: (m.reactions || []).map((r) => ({ emoji: r.emoji, userId: id(r.user) })),
+    createdAt: m.createdAt,
+  };
+
+export const normRecurring = (r) =>
+  r && {
+    id: id(r),
+    groupId: id(r.group),
+    title: r.title,
+    amount: Number(r.amount) || 0,
+    currency: r.currency || 'INR',
+    category: r.category || 'other',
+    frequency: r.frequency || 'monthly',
+    nextDate: r.nextDate,
+    anchorDay: r.anchorDay || null,
+    autoPost: r.autoPost !== false,
+    payerId: id(r.payer),
+    splitWith: ids(r.splitWith),
+    lastPostedAt: r.lastPostedAt || null,
+    postedCount: Number(r.postedCount) || 0,
+    active: r.active !== false,
+    createdBy: id(r.createdBy),
+  };
+
+export const normSplitRequest = (r) =>
+  r && {
+    id: id(r),
+    groupId: id(r.group),
+    type: r.type || 'add_bill',
+    title: r.title,
+    details: r.details || '',
+    requesterId: id(r.requester),
+    assigneeId: id(r.assignee),
+    expenseId: id(r.expense),
+    resolvedExpenseId: id(r.resolvedExpense),
+    status: r.status || 'open',
+    respondedAt: r.respondedAt || null,
+    closedById: id(r.closedBy),
+    createdAt: r.createdAt,
+  };
+
+export const normSavedPlace = (p) =>
+  p && {
+    id: id(p),
+    groupId: id(p.group),
+    name: p.name,
+    kind: p.kind || 'place',
+    category: p.category || 'other',
+    note: p.note || '',
+    typicalAmount: Number(p.typicalAmount) || 0,
+    currency: p.currency || 'INR',
+    mapsPlaceId: p.mapsPlaceId || '',
+    address: p.address || '',
+    lat: p.lat ?? null,
+    lng: p.lng ?? null,
+    mapsUrl: p.mapsUrl || '',
+    useCount: Number(p.useCount) || 0,
+    lastUsedAt: p.lastUsedAt || null,
+    createdBy: id(p.createdBy),
+    createdAt: p.createdAt,
+  };
+
+export const normMemory = (m) =>
+  m && {
+    id: id(m),
+    groupId: id(m.group),
+    expenseId: id(m.expense),
+    authorId: id(m.author),
+    title: m.title || '',
+    note: m.note || '',
+    place: m.place || '',
+    photo: m.photo || '',
+    date: m.date,
+    createdAt: m.createdAt,
+  };
+
 /* ================================================================
    ENDPOINTS
    ================================================================ */
@@ -269,6 +353,26 @@ export const api = {
   joinGroup: (code) => post('/groups/join', { code }),
   leaveGroup: (gid) => post(`/groups/${gid}/leave`),
   rotateGroupCode: (gid) => post(`/groups/${gid}/code`),
+  /* group engagement — chat, recurring bills, requests, places, memories */
+  groupEngagement: (gid) => get(`/groups/${gid}/engagement`),
+  engagementSummary: () => get('/engagement/summary'),
+  groupMessages: (gid, params = '') => get(`/groups/${gid}/messages${params}`),
+  createGroupMessage: (gid, body) => post(`/groups/${gid}/messages`, body),
+  reactToMessage: (gid, mid, emoji) => post(`/groups/${gid}/messages/${mid}/react`, { emoji }),
+  deleteGroupMessage: (gid, mid) => del(`/groups/${gid}/messages/${mid}`),
+  createRecurring: (gid, body) => post(`/groups/${gid}/recurring`, body),
+  updateRecurring: (gid, rid, body) => patch(`/groups/${gid}/recurring/${rid}`, body),
+  skipRecurring: (gid, rid) => post(`/groups/${gid}/recurring/${rid}/skip`),
+  deleteRecurring: (gid, rid) => del(`/groups/${gid}/recurring/${rid}`),
+  createSplitRequest: (gid, body) => post(`/groups/${gid}/requests`, body),
+  updateSplitRequest: (gid, rid, body) => patch(`/groups/${gid}/requests/${rid}`, body),
+  deleteSplitRequest: (gid, rid) => del(`/groups/${gid}/requests/${rid}`),
+  createSavedPlace: (gid, body) => post(`/groups/${gid}/places`, body),
+  updateSavedPlace: (gid, pid, body) => patch(`/groups/${gid}/places/${pid}`, body),
+  deleteSavedPlace: (gid, pid) => del(`/groups/${gid}/places/${pid}`),
+  createMemory: (gid, body) => post(`/groups/${gid}/memories`, body),
+  deleteMemory: (gid, mid) => del(`/groups/${gid}/memories/${mid}`),
+  markBadgesSeen: (gid, badges) => post(`/groups/${gid}/badges/seen`, { badges }),
 
   /* expenses */
   expenses: (params = '') => get(`/expenses${params}`),

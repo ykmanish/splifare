@@ -56,7 +56,7 @@ async function decode(blob) {
  *
  * Returns base64 without the `data:` prefix, which is the shape the API wants.
  */
-export async function prepareImage(blob) {
+export async function prepareImage(blob, { maxEdge = MAX_EDGE, quality = QUALITY } = {}) {
   if (!blob) throw new ImageError('No image to read.');
   if (!canDecode()) throw new ImageError('This browser cannot process images.');
   if (blob.size > MAX_INPUT_BYTES) {
@@ -64,7 +64,7 @@ export async function prepareImage(blob) {
   }
 
   const bitmap = await decode(blob);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
 
@@ -80,7 +80,7 @@ export async function prepareImage(blob) {
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close?.();
 
-  const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', QUALITY));
+  const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
   if (!out) throw new ImageError('That image could not be converted.');
 
   const base64 = await blobToBase64(out);
@@ -107,3 +107,16 @@ function blobToBase64(blob) {
 
 /** A small object URL for the review thumbnail. Revoke it when done. */
 export const previewUrl = (blob) => URL.createObjectURL(blob);
+
+/**
+ * A timeline-sized `data:` URL, small enough to live inside a document.
+ *
+ * Receipt scanning wants every pixel the vision model can use; a memory photo
+ * is displayed at roughly 160 px on a phone and stored in Mongo rather than a
+ * bucket, so the trade runs the other way. 900 px at 0.72 lands around 60–90 KB
+ * — under the route's cap with room for a photo that happens to be busy.
+ */
+export async function prepareThumb(blob) {
+  const { base64, mediaType } = await prepareImage(blob, { maxEdge: 900, quality: 0.72 });
+  return `data:${mediaType};base64,${base64}`;
+}

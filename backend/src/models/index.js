@@ -105,6 +105,176 @@ const groupSchema = new Schema(
 );
 groupSchema.index({ members: 1 });
 
+/* --------------------------------------------------------- Group Feature */
+
+const reactionSchema = new Schema(
+  {
+    emoji: { type: String, required: true, maxlength: 8 },
+    user: { ...ref('User'), required: true },
+  },
+  { _id: false },
+);
+
+const groupMessageSchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    /** Set when the message belongs to one bill's thread rather than the room. */
+    expense: { ...ref('Expense'), default: null, index: true },
+    author: { ...ref('User'), required: true },
+    text: { type: String, required: true, trim: true, maxlength: 500 },
+    reactions: { type: [reactionSchema], default: [] },
+  },
+  baseOptions,
+);
+/* The chat pages backwards from newest, per room and per bill thread. */
+groupMessageSchema.index({ group: 1, expense: 1, createdAt: -1 });
+
+const recurringExpenseSchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    title: { type: String, required: true, trim: true, maxlength: 100 },
+    amount: { type: Number, default: 0, min: 0 },
+    currency: { type: String, default: 'INR' },
+    category: { type: String, default: 'other' },
+    frequency: {
+      type: String,
+      enum: ['weekly', 'monthly', 'quarterly', 'yearly'],
+      default: 'monthly',
+    },
+    nextDate: { type: Date, default: Date.now },
+    /**
+     * The day of the month the bill was originally set for.
+     *
+     * Kept separately from `nextDate` because a rent due on the 31st has to
+     * come back to the 31st after February, and a date that has already been
+     * clamped down to the 28th has forgotten where it started.
+     */
+    anchorDay: { type: Number, default: null, min: 1, max: 31 },
+    /** Off means "remind me", on means "post it to the ledger for me". */
+    autoPost: { type: Boolean, default: true },
+    payer: { ...ref('User'), default: null },
+    splitWith: [ref('User')],
+    lastPostedAt: { type: Date, default: null },
+    postedCount: { type: Number, default: 0 },
+    createdBy: ref('User'),
+    active: { type: Boolean, default: true },
+  },
+  baseOptions,
+);
+/* The due sweep runs on every group open, so it must be an index hit. */
+recurringExpenseSchema.index({ group: 1, active: 1, autoPost: 1, nextDate: 1 });
+
+const splitRequestSchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    type: {
+      type: String,
+      enum: ['add_bill', 'confirm_expense', 'settle_up'],
+      default: 'add_bill',
+    },
+    title: { type: String, required: true, trim: true, maxlength: 120 },
+    details: { type: String, default: '', trim: true, maxlength: 400 },
+    requester: { ...ref('User'), required: true },
+    assignee: { ...ref('User'), default: null },
+    expense: { ...ref('Expense'), default: null },
+    /** Set once the assignee actually adds the bill the request asked for. */
+    resolvedExpense: { ...ref('Expense'), default: null },
+    status: {
+      type: String,
+      enum: ['open', 'accepted', 'done', 'declined', 'dismissed'],
+      default: 'open',
+    },
+    respondedAt: { type: Date, default: null },
+    closedBy: { ...ref('User'), default: null },
+  },
+  baseOptions,
+);
+
+const savedPlaceSchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    kind: { type: String, default: 'restaurant', trim: true, maxlength: 40 },
+    category: { type: String, default: 'food' },
+    note: { type: String, default: '', trim: true, maxlength: 240 },
+    /** Typical spend, offered as the amount when a bill starts from here. */
+    typicalAmount: { type: Number, default: 0, min: 0 },
+    currency: { type: String, default: 'INR' },
+
+    /*
+     * Where it is, when the place was picked from Google rather than typed.
+     *
+     * The place id is the durable handle — a restaurant can move or be
+     * renamed and the id still resolves — so it is what the map and the
+     * directions link are built from. The coordinates and address are kept
+     * alongside it so a saved place still shows something useful if the
+     * Maps key is ever missing or the API is down.
+     */
+    mapsPlaceId: { type: String, default: '', trim: true, maxlength: 300 },
+    address: { type: String, default: '', trim: true, maxlength: 300 },
+    lat: { type: Number, default: null, min: -90, max: 90 },
+    lng: { type: Number, default: null, min: -180, max: 180 },
+    mapsUrl: { type: String, default: '', trim: true, maxlength: 600 },
+    /** How often a bill actually started here — the sort key for the list. */
+    useCount: { type: Number, default: 0 },
+    lastUsedAt: { type: Date, default: null },
+    createdBy: ref('User'),
+  },
+  baseOptions,
+);
+
+/**
+ * A photo, note or place pinned to the group's timeline.
+ *
+ * Deliberately separate from Expense: the point of a trip timeline is the
+ * things that were not bills — the view from the hotel, the name of the beach
+ * — and hanging those off an expense would mean inventing a zero-rupee one to
+ * hold them. A memory may reference an expense, but it does not need to.
+ */
+const groupMemorySchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    expense: { ...ref('Expense'), default: null },
+    author: { ...ref('User'), required: true },
+    title: { type: String, default: '', trim: true, maxlength: 120 },
+    note: { type: String, default: '', trim: true, maxlength: 500 },
+    place: { type: String, default: '', trim: true, maxlength: 120 },
+    /**
+     * A downscaled JPEG data URL, or empty.
+     *
+     * Inline rather than in object storage because the app has no bucket and
+     * a timeline thumbnail is a few tens of kilobytes; the route caps the
+     * string so one memory can never bloat a document past what Mongo will
+     * comfortably hand back in a list query.
+     */
+    photo: { type: String, default: '' },
+    date: { type: Date, default: Date.now },
+  },
+  baseOptions,
+);
+groupMemorySchema.index({ group: 1, date: -1 });
+
+/**
+ * When a badge was first seen as earned.
+ *
+ * Not the source of truth for *whether* it is earned — that is recomputed
+ * from the group's data every load (see utils/badges.js). This row exists so
+ * the unlock animation plays exactly once, and so the shelf can be ordered by
+ * when things happened.
+ */
+const badgeAwardSchema = new Schema(
+  {
+    group: { ...ref('Group'), required: true, index: true },
+    user: { ...ref('User'), required: true },
+    badge: { type: String, required: true },
+    earnedAt: { type: Date, default: Date.now },
+    /** Cleared until the owner has actually seen the celebration. */
+    seen: { type: Boolean, default: false },
+  },
+  baseOptions,
+);
+badgeAwardSchema.index({ group: 1, user: 1, badge: 1 }, { unique: true });
+
 /* --------------------------------------------------------------- Expense */
 
 const shareSchema = new Schema(
@@ -148,6 +318,8 @@ const expenseSchema = new Schema(
     items: { type: [expenseItemSchema], default: [] },
     createdBy: ref('User'),
     list: { ...ref('ShoppingList'), default: null },
+    /** Set when the schedule posted this rather than a person. */
+    recurring: { ...ref('RecurringExpense'), default: null },
     /** Denormalised for cheap "expenses involving me" queries. */
     participants: [ref('User')],
   },
@@ -296,6 +468,11 @@ const notificationSchema = new Schema(
         'expense_deleted',
         'settle',
         'reminder',
+        'split_request',
+        'split_request_update',
+        'recurring_posted',
+        'badge_earned',
+        'group_message',
         'list_shared',
         'list_completed',
         'group_invite',
@@ -418,4 +595,10 @@ module.exports = {
   Activity: model('Activity', activitySchema),
   ScanUsage: model('ScanUsage', scanUsageSchema),
   Reminder: model('Reminder', reminderSchema),
+  GroupMessage: model('GroupMessage', groupMessageSchema),
+  RecurringExpense: model('RecurringExpense', recurringExpenseSchema),
+  SplitRequest: model('SplitRequest', splitRequestSchema),
+  SavedPlace: model('SavedPlace', savedPlaceSchema),
+  GroupMemory: model('GroupMemory', groupMemorySchema),
+  BadgeAward: model('BadgeAward', badgeAwardSchema),
 };
