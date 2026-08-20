@@ -32,14 +32,24 @@ import { useToast } from '@/components/ui/Toast';
  */
 
 const EASE_OUT = [0.12, 0.72, 0.16, 1];
-const WHEEL_COLORS = [
-  'var(--grape)',
-  'var(--mint)',
-  'var(--butter)',
-  'var(--sky)',
-  'var(--blush)',
-  'var(--peach)',
-];
+
+/**
+ * The wheel carries its own palette instead of the theme's.
+ *
+ * Two things went wrong when it used tokens. In dark mode the pastels are
+ * 25%-alpha washes — they exist to tint a dark *surface*, and as opaque pie
+ * fills they came out as mud. And `var(--ink)` is not a variable at all:
+ * Tailwind v4 exposes `--color-ink`, so the SVG `fill` silently fell back to
+ * black, which is invisible on those dark segments.
+ *
+ * A game board should look the same whichever theme you are in, so these are
+ * fixed values with a fixed ink chosen to contrast against them — the same
+ * reasoning as `--hero-card`, which is deliberately light in both themes and
+ * carries its own dark text.
+ */
+const WHEEL_COLORS = ['#d9cff8', '#c2e7d4', '#f8e5a2', '#c9ddfb', '#f9d2dd', '#fad5b7'];
+const WHEEL_INK = '#0b0c0d';
+const WHEEL_EDGE = '#ffffff';
 
 const DEFAULT_TREATS = ['coffee', 'dessert', 'the tip', 'chai', 'ice cream', 'the cab home'];
 
@@ -80,18 +90,29 @@ function Wheel({ people, controls, size = 240 }) {
 
   return (
     <div className="relative mx-auto" style={{ width: size, height: size }}>
-      {/* The pointer sits outside the rotating group so it stays at the top. */}
-      <span
+      {/*
+       * The pointer sits outside the rotating group so it stays at the top.
+       *
+       * Drawn rather than built from CSS borders because it needs an outline:
+       * it was `var(--panel)`, which is near-black in *both* themes, so in dark
+       * mode it was a black arrow on a black card. Dark fill plus a light
+       * stroke reads against the pastel wheel and either background.
+       */}
+      <svg
         aria-hidden
-        className="absolute left-1/2 top-[-2px] z-10 -translate-x-1/2"
-        style={{
-          width: 0,
-          height: 0,
-          borderLeft: '9px solid transparent',
-          borderRight: '9px solid transparent',
-          borderTop: '15px solid var(--panel)',
-        }}
-      />
+        width="20"
+        height="17"
+        viewBox="0 0 20 17"
+        className="absolute left-1/2 top-[-3px] z-10 -translate-x-1/2"
+      >
+        <path
+          d="M10 16 L1.5 1.5 L18.5 1.5 Z"
+          fill={WHEEL_INK}
+          stroke={WHEEL_EDGE}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+      </svg>
       <motion.svg
         viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`}
         width={size}
@@ -110,7 +131,7 @@ function Wheel({ people, controls, size = 240 }) {
               <path
                 d={slicePath(a1, a2, r)}
                 fill={WHEEL_COLORS[i % WHEEL_COLORS.length]}
-                stroke="var(--surface)"
+                stroke={WHEEL_EDGE}
                 strokeWidth="1.5"
               />
               <text
@@ -120,15 +141,15 @@ function Wheel({ people, controls, size = 240 }) {
                 dominantBaseline="middle"
                 transform={`rotate(${mid} ${tx} ${ty})`}
                 className="newq"
-                style={{ fontSize: people.length > 6 ? 9 : 11, fill: 'var(--ink)' }}
+                style={{ fontSize: people.length > 6 ? 9 : 11, fill: WHEEL_INK }}
               >
                 {firstName(p.name).slice(0, 9)}
               </text>
             </g>
           );
         })}
-        <circle r="17" fill="var(--surface)" />
-        <circle r="17" fill="none" stroke="var(--line)" strokeWidth="1" />
+        <circle r="17" fill={WHEEL_EDGE} />
+        <circle r="17" fill="none" stroke="rgba(0,0,0,0.10)" strokeWidth="1" />
       </motion.svg>
     </div>
   );

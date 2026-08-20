@@ -85,6 +85,33 @@ export default function LandingPage() {
     if (ready && session) router.replace('/dashboard');
   }, [ready, session, router]);
 
+  /*
+   * Only pitch the app to someone who is not already using it.
+   *
+   * The redirect above was always here, but it fires from an effect — so a
+   * signed-in user opening the root got the full "Split the bill with your
+   * friends" sell, hero art and a Get started button, for as long as the
+   * session check and then the navigation took. Holding the marketing behind
+   * a known-logged-out check turns that into a splash.
+   *
+   * `ready` is false on the server and on the client's first pass, so this
+   * branch is also what both render initially — the splash costs no hydration
+   * mismatch.
+   */
+  if (!ready || session) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-canvas">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.45, ease: EASE }}
+        >
+          <Logo size={40} />
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-canvas">
       <div className="phone flex min-h-dvh flex-col px-5 pb-safe pt-6">

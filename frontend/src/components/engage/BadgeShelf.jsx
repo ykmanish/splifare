@@ -131,7 +131,13 @@ function BadgeTile({ badge, onOpen, index }) {
         </span>
       </ProgressRing>
 
-      <span className="newq w-full truncate text-[11.5px] leading-tight text-ink">{badge.name}</span>
+      {/* Two lines, not truncated. At four across, "First Settlement" and
+          "Receipt Master" both became ellipses — a badge whose name you cannot
+          read is not a badge. Three across plus wrapping fits every name in
+          the catalogue. */}
+      <span className="newq line-clamp-2 min-h-[2.1em] w-full text-[11.5px] leading-tight text-ink">
+        {badge.name}
+      </span>
       {!badge.earned && badge.target > 1 && (
         <span className="num text-[10.5px] text-ink-3">
           {badge.value}/{badge.target}
@@ -236,8 +242,8 @@ export default function BadgeShelf({ badges = [], loading, onSeen }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-4 gap-2">
-        {Array.from({ length: 8 }, (_, i) => (
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: 9 }, (_, i) => (
           <div key={i} className="h-[104px] animate-pulse rounded-[20px] bg-surface-2" />
         ))}
       </div>
@@ -257,7 +263,7 @@ export default function BadgeShelf({ badges = [], loading, onSeen }) {
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {sorted.map((b, i) => (
           <BadgeTile key={b.id} badge={b} index={i} onOpen={setDetail} />
         ))}
