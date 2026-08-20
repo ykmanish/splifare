@@ -213,6 +213,48 @@ async function main() {
   });
   check('using a place bumps its count', used.data.place?.useCount === 1);
 
+  const noAmount = await call(`/groups/${groupId}/places`, {
+    method: 'POST', token: A, body: { name: 'Place with no amount' },
+  });
+  check('a place saves without an amount', noAmount.status === 201,
+    JSON.stringify(noAmount.data).slice(0, 120));
+
+  /* Google Maps fields. The URL is rendered as an anchor and loaded into an
+     iframe, so anything but a real Google https link has to be dropped. */
+  const pinned = await call(`/groups/${groupId}/places`, {
+    method: 'POST', token: A,
+    body: {
+      name: 'Sagar Ratna', kind: 'restaurant',
+      mapsPlaceId: 'ChIJy29WSVfiDDkR0FNcTvG5j6M',
+      address: 'K-15, Connaught Circus, New Delhi',
+      lat: 28.6353356, lng: 77.2204228,
+      mapsUrl: 'https://maps.google.com/?cid=1178551234',
+    },
+  });
+  check('a Google-picked place keeps its id, address and coordinates',
+    pinned.data.place?.mapsPlaceId === 'ChIJy29WSVfiDDkR0FNcTvG5j6M' &&
+      pinned.data.place?.lat === 28.6353356 &&
+      pinned.data.place?.mapsUrl.startsWith('https://maps.google.com'));
+
+  for (const [label, url] of [
+    ['a javascript: URL', 'javascript:alert(1)'],
+    ['a lookalike host', 'https://google.com.evil.tld/maps'],
+    ['a plain-http Google URL', 'http://www.google.com/maps'],
+    ['an unrelated host', 'https://evil.example/maps'],
+  ]) {
+    const bad = await call(`/groups/${groupId}/places`, {
+      method: 'POST', token: A, body: { name: `Bad ${label}`, mapsUrl: url },
+    });
+    check(`${label} is stripped from a saved place`, bad.data.place?.mapsUrl === '',
+      `stored ${JSON.stringify(bad.data.place?.mapsUrl)}`);
+  }
+
+  const badCoords = await call(`/groups/${groupId}/places`, {
+    method: 'POST', token: A, body: { name: 'Bad coords', lat: 999, lng: 0 },
+  });
+  check('out-of-range coordinates are refused', badCoords.status === 400,
+    `got ${badCoords.status}`);
+
   /* ---------------------------------------------------------- memories */
   const tinyJpeg =
     'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
@@ -249,8 +291,15 @@ async function main() {
     chatter && chatter.target === 25 && chatter.value >= 1,
     chatter ? `${chatter.value}/${chatter.target}` : 'missing');
 
+  /* Derived from what the run actually created rather than a hardcoded
+     number, so adding a place case above cannot break an unrelated check. */
   const guide = badges.find((b) => b.id === 'local_guide');
-  check('place count feeds the Local Guide badge', guide && guide.value === 1);
+  const placeCount = (final.data.places || []).length;
+  check(
+    'place count feeds the Local Guide badge, capped at its target',
+    guide && guide.value === Math.min(guide.target, placeCount),
+    guide ? `${guide.value} vs min(${guide.target}, ${placeCount})` : 'missing',
+  );
 
   const seen = await call(`/groups/${groupId}/badges/seen`, {
     method: 'POST', token: A, body: { badges: badges.filter((b) => b.earned).map((b) => b.id) },
