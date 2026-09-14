@@ -14,18 +14,27 @@ export const isValidUpiId = (id) => UPI_RE.test(String(id || '').trim());
 
 /** UPI settles in rupees only — there is no currency field to negotiate. */
 export const UPI_CURRENCY = 'INR';
+export const UPI_MIN_AMOUNT = 2;
 
 /**
  * Build the link. Returns `null` rather than a half-built URL whenever it
  * would not work: no payee handle, a malformed one, nothing to pay, or a
  * currency UPI cannot carry.
  */
-export function buildUpiLink({ upiId, payeeName, amount, note, currency = UPI_CURRENCY }) {
+export function buildUpiLink({
+  upiId,
+  payeeName,
+  amount,
+  note,
+  currency = UPI_CURRENCY,
+  includeAmount = true,
+}) {
   const vpa = String(upiId || '').trim();
   if (!isValidUpiId(vpa)) return null;
 
   const value = Number(amount);
-  if (!Number.isFinite(value) || value <= 0) return null;
+  if (includeAmount && (!Number.isFinite(value) || value <= 0)) return null;
+  if (includeAmount && value < UPI_MIN_AMOUNT) return null;
   if (String(currency).toUpperCase() !== UPI_CURRENCY) return null;
 
   /*
@@ -38,13 +47,14 @@ export function buildUpiLink({ upiId, payeeName, amount, note, currency = UPI_CU
    * Interpolating `vpa` raw is safe only because UPI_RE has already passed
    * it: the pattern permits no `&`, `=`, `?` or `#`, so it cannot invent a
    * parameter. Never move this above the validation.
-   */
+  */
   const parts = [
     `pa=${vpa}`,
-    // Two decimals exactly: some apps reject a bare integer or a long float.
-    `am=${value.toFixed(2)}`,
     `cu=${UPI_CURRENCY}`,
   ];
+
+  // Two decimals exactly: some apps reject a bare integer or a long float.
+  if (includeAmount) parts.push(`am=${value.toFixed(2)}`);
 
   const name = String(payeeName || '').trim();
   if (name) parts.push(`pn=${encodeURIComponent(name.slice(0, 50))}`);

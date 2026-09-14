@@ -20,7 +20,7 @@ import Avatar from '@/components/ui/Avatar';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/components/ui/Toast';
 import { buildLedger, balanceBetween } from '@/lib/balances';
-import { buildUpiLink } from '@/lib/upi';
+import { buildUpiLink, isValidUpiId, UPI_CURRENCY } from '@/lib/upi';
 import { haptics } from '@/lib/haptics';
 import { money, firstName } from '@/lib/format';
 
@@ -140,10 +140,9 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const canSave = !!withId && total > 0;
 
   /**
-   * Only offered when you are the one paying: a deep link can pre-fill their
-   * app, but it cannot make someone else send you money. `buildUpiLink`
-   * returns null unless there is a valid handle, a positive amount and
-   * rupees, so this single check covers all of it.
+   * Only offered when you are the one paying: a deep link opens the payee in
+   * their UPI app, but leaves the amount for the user to enter/confirm there.
+   * Some banks reject prefilled intent amounts with misleading limit errors.
    */
   const upiLink =
     direction === 'pay'
@@ -153,8 +152,17 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
           amount: total,
           currency,
           note: note.trim() || `Splitta settle up`,
+          includeAmount: false,
         })
       : null;
+  const upiBlockedReason =
+    direction !== 'pay' || !withId || !other
+      ? ''
+      : currency !== UPI_CURRENCY
+        ? 'UPI can only be opened for INR payments.'
+        : !isValidUpiId(other?.upiId)
+          ? `${firstName(other?.name)} has not added a valid UPI ID.`
+          : '';
 
   async function onSubmit(e) {
     e?.preventDefault();
@@ -255,18 +263,28 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="newq block text-[15px] text-white dark:text-on-brand">
-                    Pay {money(total, currency)} by UPI
+                    Open UPI app
                   </span>
                   <span className="newq block truncate text-[12px] text-on-panel-2 dark:text-on-brand/70">
-                    Opens your UPI app · {other?.upiId}
+                    Pay {money(total, currency)} to {other?.upiId}
                   </span>
                 </span>
               </a>
               <p className="newq mt-2 px-1.5 text-[12px]">
                 {handedOff
-                  ? 'Once it goes through, record it below so your balance updates.'
-                  : 'Splitta cannot see whether a UPI transfer succeeded, so recording it stays a separate step.'}
+                  ? 'After paying in your UPI app, record it below so your balance updates.'
+                  : 'Enter or confirm the amount in your UPI app. Splitta cannot see whether the transfer succeeded.'}
               </p>
+            </Section>
+          )}
+
+          {!upiLink && upiBlockedReason && (
+            <Section i={0.5}>
+              <GroupLabel>Pay now</GroupLabel>
+              <div className="rounded-[18px] bg-surface-2 px-4 py-3.5">
+                <p className="newq text-[14px] text-ink">UPI hand-off unavailable</p>
+                <p className="newq mt-1 text-[12.5px] text-ink-3">{upiBlockedReason}</p>
+              </div>
             </Section>
           )}
 
