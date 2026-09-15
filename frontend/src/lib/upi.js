@@ -17,6 +17,19 @@ export const UPI_CURRENCY = 'INR';
 export const UPI_MIN_AMOUNT = 2;
 
 /**
+ * A fresh `tr` (transaction reference) per hand-off. Without one, several
+ * PSPs/banks cannot tell two intents to the same payee apart from a
+ * duplicate or replayed request — repeatedly opening the same "pay ₹1"
+ * link (exactly what testing a settle-up does) then gets refused with a
+ * generic bank-limit-style error instead of an honest "duplicate" one.
+ * Alphanumeric and well under NPCI's 35-char cap.
+ */
+function generateTr() {
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `SP${Date.now().toString(36)}${rand}`.toUpperCase();
+}
+
+/**
  * Build the link. Returns `null` rather than a half-built URL whenever it
  * would not work: no payee handle, a malformed one, nothing to pay, or a
  * currency UPI cannot carry.
@@ -61,6 +74,8 @@ export function buildUpiLink({
 
   const tn = String(note || '').trim();
   if (tn) parts.push(`tn=${encodeURIComponent(tn.slice(0, 50))}`);
+
+  parts.push(`tr=${generateTr()}`);
 
   return `upi://pay?${parts.join('&')}`;
 }
