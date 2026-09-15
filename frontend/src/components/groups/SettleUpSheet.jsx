@@ -140,9 +140,13 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
   const canSave = !!withId && total > 0;
 
   /**
-   * Only offered when you are the one paying: a deep link opens the payee in
-   * their UPI app, but leaves the amount for the user to enter/confirm there.
-   * Some banks reject prefilled intent amounts with misleading limit errors.
+   * Only offered when you are the one paying: a deep link opens the payee,
+   * amount and note pre-filled in their UPI app. `buildUpiLink` returns null
+   * unless there is a valid handle, a positive amount and rupees, so this
+   * single check covers all of it. A "bank limit" style error on send is a
+   * receiving-side restriction (a fresh/lightly-used payee VPA, or a bank
+   * flagging repeated identical small amounts) — the amount here is never
+   * what's wrong, so there is nothing to withhold it for.
    */
   const upiLink =
     direction === 'pay'
@@ -152,7 +156,6 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
           amount: total,
           currency,
           note: note.trim() || `Splitta settle up`,
-          includeAmount: false,
         })
       : null;
   const upiBlockedReason =
@@ -273,7 +276,7 @@ export default function SettleUpSheet({ open, onClose, prefill = {} }) {
               <p className="newq mt-2 px-1.5 text-[12px]">
                 {handedOff
                   ? 'After paying in your UPI app, record it below so your balance updates.'
-                  : 'Enter or confirm the amount in your UPI app. Splitta cannot see whether the transfer succeeded.'}
+                  : 'Splitta cannot see whether a UPI transfer succeeded, so recording it stays a separate step.'}
               </p>
             </Section>
           )}

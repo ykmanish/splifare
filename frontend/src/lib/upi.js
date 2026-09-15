@@ -14,7 +14,8 @@ export const isValidUpiId = (id) => UPI_RE.test(String(id || '').trim());
 
 /** UPI settles in rupees only — there is no currency field to negotiate. */
 export const UPI_CURRENCY = 'INR';
-export const UPI_MIN_AMOUNT = 2;
+/** NPCI's own floor for a P2P transfer — there is no such thing as a smaller one. */
+export const UPI_MIN_AMOUNT = 1;
 
 /**
  * A fresh `tr` (transaction reference) per hand-off. Without one, several
